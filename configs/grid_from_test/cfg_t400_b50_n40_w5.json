@@ -1,0 +1,30 @@
+{
+  "config_type": "linear_distance",
+  "config": {
+    "n_nodes": 40,
+    "T": 400,
+    "total_bikes": 50,
+    "total_workers": 5,
+    "demand_level": 0.6,
+    "base_demand_by_node": null,
+    "time_multipliers": null,
+    "od_dirichlet_alpha": 1.0,
+    "coords": null,
+    "coord_scale": 10.0,
+    "d_base": 1.0,
+    "d_slope": 0.1,
+    "c_base": 1.0,
+    "c_slope": 0.1,
+    "phi_base": 0.05,
+    "phi_slope": 0.01,
+    "phi_min": 0.0,
+    "phi_max": 0.6,
+    "revenue_level": 5.0,
+    "penalty_Cp": 2.0,
+    "price_ub": 10.0,
+    "bigM_Q": 10000.0,
+    "initial_backlog_level": 0,
+    "enforce_integer_lags": true
+  },
+  "seed": 42
+}

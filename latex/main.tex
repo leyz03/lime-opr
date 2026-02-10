@@ -1,0 +1,325 @@
+\documentclass[trsc,nonblindrev]{informs3noheader}
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\usepackage[utf8]{inputenc}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{verbatim}
+
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+
+\usepackage[
+  backend=biber,
+  style=authoryear,
+  natbib=true
+]{biblatex}
+
+\addbibresource{refs.bib}
+
+
+\OneAndAHalfSpacedXI
+
+\begin{document}
+
+\TITLE{Lime operations}
+
+\ARTICLEAUTHORS{
+\AUTHOR{}
+\AFF{
+\EMAIL{}}
+}
+\maketitle
+
+
+\section{Model Description}
+\begin{itemize}
+    \item Region (Nodes) $i \in N$ 
+    \item Finite time horizon $t=1, 2, \dots, T$
+    \item Available bikes $A_{i}^t$ and unavailable bikes $U_{i}^t$
+    \item Time cost for traveling from node $i$ to $j$ via scooter $t_{ij}$
+    \item Worker time cost of traveling from $i$ to $j$ is $d_{ij}$
+    \item Task operation cost from $i$ to $j$ is $c_{ij}$
+    \item Potential demand: $D_{ij}^t$ (e.g.\ Poisson with rate $\lambda_{ij}^t$). The total demand of trips start from station $i$ is
+    \[
+    D_i^t={\sum_{j \in N}D_{ij}^t}
+    \]
+    \item Served demand: The number of demand starts from station $i$ is
+    \[
+    Y_i^t = \min\{A_{i}^t,\, D_i^t\}
+    \]
+    The destination specified demand for each destination $j$ is given by
+    \[
+    Y_{ij}^t = Y_i^t \times {\frac{D_{ij}^t}{D_i^t}}
+    \]
+   
+    \item Lost demand: 
+    Since the penalty for unsatisfied demand is not o-d based, we do not need to track the demand loss on each o-d. The number of unsatisfied demand from station $i$ is
+    \[
+      L_{i}^t = D_i^t - Y_i^t
+    \]
+    The total lost demand in a decision epoch which needs to be penalized is
+    \[
+    L^t = \sum_{i\in N} L_i^t
+    \]
+
+    \item $R_{ij}$ is the revenue platform gets from customer trip $ij$, $C_p$ is the penalty for unsatisfied demand.
+    
+    \item A bike becomes unavailable after trip $ij$ with probability $\phi_{ij}$
+    \item Bikes arriving at $j$ by users at time $t$ that remain available 
+    \[F_j^t = \sum_{i \in N} Y_{ij}^{t- t_{ij}}(1-\phi_{ij})\]Bikes that arrive at $j$ at time $t$ that are unavailable 
+    \[\bar{F}_{j}^t = \sum_{i \in N} Y_{ij}^{t- t_{ij}}\phi_{ij}\]
+    
+    \item Task posted at time $t$: 
+    \begin{itemize}
+    \item Number of bikes to swap at station $i$: $\hat{m}_{ii}^t$, should have
+    \[
+    \hat{m}_{jj}^t\leq U_j^t + \bar{F}_j^t
+    \]
+    \item Number of bikes to move from $i$ to $j$: $\hat{m}_{ij}^t$, should have
+    \[
+    \hat{m}_{ij}^t\le A_j^t - Y_j^t
+    \]
+     \end{itemize}
+     
+     \item Number of swap jobs that are open at time $t$ at node $i$: $M_{ii}^t$. Number of moving jobs that are open at time $t$ from $i$ to $j$: $M_{ij}^t$.
+
+     \item Price that platform pay for swap task: $p_{ii}$; price that platform pay for move task from $i$ to $j$: $p_{ij}$, 
+     
+     \item Number of workers available in station $i$ at epoch $t$: $W_i^t$; These workers add up to $W$
+     \item Number of swap jobs being chosen at station $i$ at time $t$:  $\tilde{s}_i^t$; Number of moving jobs being chosen from $i$ to $j$: $\tilde{m}_{ij}^t$
+
+     \item The workers' flow due to task allocation is $x_{ijk}^t$, which denotes the number of workers who starts from $i$, goes to $j$ for working and ends up in $k$, and $x_{i,idle}$ for worker idle at $i$.
+
+    \item Task Allocation Problem As Stable Matching
+
+    We model a stable matching problem between $|\mathcal{W}^t|$ workers and $|\mathcal{M}^t|$ task trips
+    
+    \begin{itemize}
+    \item Let $\mathcal{W}^t$ be the set of workers available at epoch $t$. 
+        Each worker $w\in\mathcal{W}^t$ is located at some region $\ell(w) \in N$
+        
+        \item The set of task types at epoch $t$ is
+        \[
+            \mathcal{M}^t = \{(i,j, M_{ij}^t): i,j \in N \} 
+        \]
+        and we interpret $M_{ij}^t$ as the capacity (the number of identical slots) of task trip $(i,j)$; for a task $m = (i,j,M_{ij}^t)\in \mathcal{M}^t$, $o(m)=i$, $d(m)=j$, $q_m=M_{ij}^t$.
+    \end{itemize}
+
+    \item Task payments and worker net profit:
+    \begin{itemize}
+        \item A worker $w$ located at $\ell(w)$ who undertakes a task $m \in \mathcal{M}^t$, which starts from $i$ and ends at $j$, first travels from $\ell(w)$ to $i$ and then executes the task from $i$ to $j$.
+        The corresponding net profit for worker $w$ is
+        \[
+            \mathcal{P}_w^t(i,j) = p_{ij} - d_{\ell(w),\,i} - c_{ij},
+        \]
+        
+        \item We assume that workers have an outside option of remaining idle with profit $0$, and they regard any task trip $(i,j)$ with $\mathcal{P}_w^t(i,j)  < 0$ as unacceptable.
+    \end{itemize}
+
+
+     \item We think of workers as greedy: when they are available, they choose the job with highest profit that they can get. A job is obtained by the nearest available worker. 
+     
+     \begin{itemize}
+         \item Each worker $w\in \mathcal{W}^t$ has a preference among all task trips:
+         \[
+         \Pi(w):\pi_1(w)\succ \pi_2(w)\succ\dots\succ \pi_{N^2}(w)
+         \]
+         where each element $\pi_k(w)\in \mathcal{M}^t$
+         \item Each task trip $m=(i,j,M_{ij}^t)$ has a preference among all workers:
+         \[
+         \Pi(m):\pi_1(m)\succ\pi_2(m)\succ \dots \succ \pi_W(m)
+         \]
+        \item $\mu$ is a two-side pairing function for both task trip and worker
+    \end{itemize}
+    
+    Aggregate the stable matching to the flow of workers
+    $x_{ijk}^t$ for all $i,j,k\in N$
+
+     The algorithm guarantees termination within $\mathcal{O}$($\left |\mathcal{W}^t\right|\times \left |\mathcal{M}^t\right|$) proposals; 
+    
+    The algorithm guarantees Pareto Optimality along workers within all stable matching\parencite{gale1962college}
+
+    % {\color{red}The algorithm shown above is equivalent to solving the following Integer Programming \parencite{agoston2016integer}:
+
+    % \begin{equation}
+    % \begin{aligned}
+    % \min_{x_{wm},t_m,f_m}\quad 
+    % & \sum_{m\in \mathcal{M}^t} t_m \\[4pt]
+    % \text{s.t.}\quad
+    % & \sum_{m:(w,m)\in E} x_{w,m} = 1,
+    % && \forall w\in \mathcal{W}^t, \\[6pt]
+    % & \sum_{w:(w,m)\in E} x_{w,m} \le M(m),
+    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[10pt]
+    % & t_m \le (1-x_{w,m})(\bar s+1)+s_{w,m},
+    % && \forall (w,m)\in E, \\[8pt]
+    % & s_{w,m}+1 \le
+    % t_m + \Big(\sum_{m':(w,m')\in E,\; r_{w,m'}\le r_{w,m}} x_{w,m'}\Big)(\bar s+1),
+    % && \forall (w,m)\in E, \\[10pt]
+    % & f_m\,M(m) \le \sum_{w:(w,m)\in E} x_{w,m},
+    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[8pt]
+    % & t_m \le f_m(\bar s+1),
+    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[8pt]
+    % & s_{w,m} = -d_{\ell_w,o(m)} && \forall (w,m)\in E\\[8pt]
+    % &\text{may define above }\bar s \geq  s_{w,m} && \forall (w,m)\in E\\[8pt]
+    % & x_{w,m}\in\{0,1\},\quad
+    % f_m\in\{0,1\},\quad
+    % t_m\in\{0,1,\dots,\bar s+1\},
+    % && \forall (w,m)\in E.
+    % \end{aligned}
+    % \label{inner_layer}
+    % \end{equation}
+
+    % where $x_{w,m}$ means whether to worker $w$ is picking job $m$, $t_m$ is the "score-limit" for workers to apply for job $m$, and $f_m$ is an indicator of whether job $m$ is open,  $r_{w,m} = \textbf{rank of job m in worker w's preference}$
+    % }
+ 
+     % \item An alternative modeling for task allocation:
+     
+     % $D_{ij}^t$ tracks job trip capacity from $i$ to $j$, if $i=j$, this job is a swap job, otherwise it is a move job
+     % \begin{align*}
+     %     \textbf{max} & \sum_{i,j,k\in N} x^t_{ijk} (p_{jk} - c_{ij} - c_{jk})\\
+     %     \textbf{s.t.} & \sum_{j,k\in N} x^t_{ijk} \leq W_i^t & \forall i\in N\\
+     %     & \sum_{i\in N} x_{ijk}^t \leq D_{jk}^t& \forall j,k\in N\\
+     %     & x_{ijk}\geq 0\\
+     %     & x_{ijk}\in \mathbb{Z}
+     % \end{align*}
+     % where $x_{ijk}$ is the number of workers who start from $i$, go to $j$ to seek job, and end will end their job at $k$
+
+     \item Platform chooses:
+
+\begin{itemize}
+    \item Contract prices $p_{ij}$, where $i,j\in N$
+    \item Task generation policy $\hat{m}_{ij}^t$ 
+    
+    % (mapping task state $\mathcal{S}$, bike state $A_i^t$, $U_i^t$) 
+    %\[
+    %\pi\big[( \,(s_i)_{i\in N},(m_{ij})_{i,j\in N} \,)\mid\mathcal{S}, (A_i)_{i\in N}, (U_i)_{i,j\in N}, \,(W_i)_{i\in N}\big]
+    %\]
+    \begin{itemize}
+        \item Optimization aspect: for each epoch $t$, choose optimal number of task post: $\hat{m}_{ij}^t$, where $i,j\in N$, to maximize expected revenue
+    \end{itemize}
+
+\end{itemize}
+
+\newpage
+
+\item Problem Formulation
+\begin{align}
+    \textbf{objective:}\nonumber\\
+    \mathbf{\max} \quad
+    &\mathbb{E}\left[
+    \sum_{t=1}^{T}
+    \left(
+    \sum_{i\in N} \big( \sum_{j\in N}R_{ij}\, Y_{ij}^t - C_p\, L_{i}^t \big)
+    - \sum_{(i,j)\in N\times N} p_{ij}\, \tilde{m}_{ij}^t
+    \right)
+    \right]\\[4pt]
+    \textbf{subject to:}\nonumber\\
+    & Y_i^t \leq A_{i}^t & \forall i\in \mathcal{N},  t\in [T]\\[4pt]
+    &  Y_i^t \leq D_{i}^t & \forall i\in \mathcal{N}; t\in [T]\\[4pt]
+    & Y_i^t \geq  \alpha A_{i}^t + (1-\alpha)  D_{i}^t& \forall i\in \mathcal{N}; t\in [T]\\[4pt]
+    & \alpha \leq 1 \\
+    & Y_{ij}^t = Y_i^t \times {\frac{D_{ij}^t}{D_i^t}}   &\forall i,j \in \mathcal{N}; t \in [T] \\[4pt]
+    & L_{i}^t = D_i^t - Y_i^t &\forall i \in \mathcal{N}; t \in [T] \\[4pt]
+    & L^t = \sum_{i\in \mathcal{N}} L_i^t &\forall t \in [T] \\[4pt]
+    & F_j^t = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}}(1-\phi_{ij}) &\forall  j \in \mathcal{N};t \in [T] \\[4pt] 
+    %%%%% above is constraint 51 %%%%%
+    & \bar{F_{j}^t} = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}} \phi_{ij} &\forall j \in \mathcal{N};t \in [T] \\[4pt]
+    & \hat{m}_{jj}^t\leq U_j^t + \bar{F}_j^t &\forall  j \in \mathcal{N};t \in [T] \\[4pt]
+    & \hat{m}_{ij}^t\le A_i^t - Y_i^t &\forall  i,j \in \mathcal{N},i\neq j; t \in [T] \\[4pt]
+    &A_j^{t+1}
+            = A_j^{t}
+            - Y_j^{t} % Realized services
+            + F_j^{t} % Returning bike that is not battery dead (Services completed)
+            - \sum_{k\in \mathcal{N}\setminus \{j\} } \hat{m}_{jk}^{t} % Tasks posted except for swap task, since swap task is tracked by F_j
+            + \sum_{i,k\in \mathcal{N}} x_{ikj}^{t-d_{ik}-c_{kj}} % all tasks that is to be finished at time t
+            &\quad \forall j \in \mathcal{N};\;t\in[T]\\[4pt]
+    &U_j^{t+1} % Only counts battery failure
+        = U_j^{t}
+        + \bar{F}_j^{t} % Returning dead bikes
+        - \sum_{i\in \mathcal{N}}x_{ijj}^{t-d_{ij}-c_{jj}} % 
+            &  \quad \forall j \in \mathcal{N}; \;t\in[T] \\[4pt]
+    &\sum_{j,k\in \mathcal{N}} x_{ijk}^t \le 
+        W_i^t, &\quad \forall i\in \mathcal{N};\; t\in [T]\\[4pt]
+    &W_k^{t+1}
+        = W_k^t
+        - \sum_{i,j\in \mathcal{N}} x_{kij}^{t}
+        + \sum_{i,j\in \mathcal{N}} x_{ijk}^{t-d_{ij}-c_{jk}}
+       &\quad \forall k\in \mathcal{N};\; t\in [T]\\[4pt]
+    &M_{ij}^{t+1}
+        = M_{ij}^t - \tilde{m}_{ij}^{t} + \hat{m}_{ij}^{t+1},
+        & \quad \forall i,j\in \mathcal{N};\; t\in[T]\\[4pt]
+    &\tilde{m}_{jk}^t 
+        = \sum_{i\in \mathcal{N}} x_{ijk}^t,
+        &\quad \forall j,k\in \mathcal{N};\; t\in[T]\\[4pt]
+    &0 \leq \tilde{m}_{jk}^{t} \leq M_{jk}^{t},
+        &\quad \forall j,k\in \mathcal{N}; t\in [T]
+\end{align}
+
+\begin{align}
+    & \sum_{i,j,k\in \mathcal{N}} y_{wijk}^t\le 1, &\quad \forall w\in \mathcal{W};t\in [T]\\[4pt]
+    & \sum_{\substack{{w\in \mathcal{W}}\\{i\in \mathcal{N}}}} y_{wijk}^t \le M_{jk}^t, & \quad \forall j,k\in \mathcal{N};t\in [T]\\[4pt]
+    & \sum_{j,k\in \mathcal{N}} y_{wijk}^t \le \ell_{wi}^t, & \quad \forall w\in \mathcal{W}, \forall i\in\mathcal{N};t\in [T]\\[4pt]
+    & \ell_{wi}^{t+1} = \ell_{wi}^t - \sum_{j,k\in \mathcal{N}} y_{wijk}^t + \sum_{g,h\in \mathcal{N}} y_{wghi}^{t-1-d_{gh}-c_{hi}}, & \quad \forall w\in \mathcal{W},i\in \mathcal{N};t\in [T]\\[4pt]
+    & u_{wi}^t = \sum_{j,k\in \mathcal{N}} y_{wijk}^t \left( p_{jk} - d_{ij} - c_{jk} \right), & \quad \forall w\in \mathcal{W}, i\in \mathcal{N};t\in [T]\\[4pt]
+    & u_{wi}^t \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t - \delta_{wijk}^t \, Q, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
+    & \sum_{\substack{{w'\in \mathcal{W}}\\{i':d_{i'j}\le d_{ij}}}} y^t_{w'i'jk} \geq \delta_{wijk}^t \, M_{jk}^t, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
+    & x_{ijk}^t = \sum_{w\in \mathcal{W}} y_{wijk}^t, & \quad \forall i,j,k\in \mathcal{N};t\in [T]\\[4pt]
+    & \hat{m}_{ij}^t \ge 0,\,
+    p_{ij} \geq 0,\,
+    Y_i^t \geq 0,\,
+    A_i^t \geq 0,\,
+    Y_{ij}^t \geq 0,\,
+    L_i^t \geq 0,\,
+    L_t \ge 0, & \nonumber\\[4pt]
+    & F_j^t \ge 0,\,
+    \bar{F}_j^t \ge 0,\,
+    U_i^t \geq 0,\,
+    x_{ijk}^t \ge 0,\,
+    W_i^t \ge 0,\,
+    M_{jk}^t \ge 0,\,
+    \tilde{m}_{jk}^t \ge 0 & \nonumber\\[4pt]
+    & y_{wijk}^t\in \{0,1\}, \,
+    \ell_{wi}^t \in \{0,1\},\,
+    u_{wi}^t\ge 0,\,
+    \delta_{wijk}^t\in \{0,1\}, \,
+    \alpha \ge 0, 
+    & \quad \forall i,j,k\in \mathcal{N}; t\in [T]; w\in \mathcal{W}
+\end{align}
+
+where $y_{wijk}^t$ denotes whether worker $w$ departs from $i$, pick up job at $j$ and end up at $k$, $l_{wi}^t$ denotes the availability of worker $w$ at node $i$, $\delta_{wijk}^t$ denotes whether job $jk$ is full with worker better-equal than worker $w$ who is currently at $i$, $u_{wi}^t$ denotes the true profit of a worker in a matching.
+
+Constraint (25) denotes that if a worker does not go to a vacant job $jk$, then its true profit must be bigger than the true profit of doing $jk$; if a worker does nothing, then either he/she is unavailable, or all positive-profit jobs are full.
+
+Constraint (26) denotes that if $\delta_{wijk}^t=1$, then job $jk$ is full with worker better-equal than worker $w$ who is currently at $i$.
+
+\begin{lemma}
+    Any feasible matching given by constraints (20)-(26) is a stable matching.
+\end{lemma}
+
+To prove this, we need to prove that any feasible matching will satisfy the constraints (30)-(32)\cite{baiou2000stable} below:
+\begin{itemize}
+    \item Constraint (30):
+    
+    \item Constraint (31):
+    
+    \item Constraint (32):
+    
+\end{itemize}
+
+\newpage
+
+{\color{red}
+Previously we have:
+\begin{align}
+    & y_{wm}^t \in \{0,1\} &\forall (w,m)\in \mathcal{W}^t\times \mathcal{M}^t\\[4pt]
+    & \sum_{m\in \mathcal{M}^t} y_{wm}^t \le 1  &\forall w\in \mathcal{W}^t; t\in [T]\\[4pt]
+    &\sum_{w\in \mathcal{W}^t} y_{wm}^t \le M_m^t &\forall m\in \mathcal{M}^t; t\in [T] \\[4pt]
+    &M_m^t\,(1 - \sum_{q\in S_{mw}}y^t_{wq}) \leq \sum_{p\in T_{mw}} y^t_{pm} & \forall (w,m)\in \mathcal{W}^t\times \mathcal{M}^t,\;t\in [T]
+    \\[4pt]
+    & x_{ijk}^t = \sum y^t_{wm} & \forall t\in [T],\,i,j,k\in N\\[4pt]
+\end{align}
+where the major problem is that the index set for constraints is uncertain
+}
+
+\end{itemize}
+\printbibliography
+\end{document}
