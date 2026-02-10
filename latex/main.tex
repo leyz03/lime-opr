@@ -261,7 +261,7 @@
     & \ell_{wi}^{t+1} = \ell_{wi}^t - \sum_{j,k\in \mathcal{N}} y_{wijk}^t + \sum_{g,h\in \mathcal{N}} y_{wghi}^{t-1-d_{gh}-c_{hi}}, & \quad \forall w\in \mathcal{W},i\in \mathcal{N};t\in [T]\\[4pt]
     & u_{wi}^t = \sum_{j,k\in \mathcal{N}} y_{wijk}^t \left( p_{jk} - d_{ij} - c_{jk} \right), & \quad \forall w\in \mathcal{W}, i\in \mathcal{N};t\in [T]\\[4pt]
     & u_{wi}^t \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t - \delta_{wijk}^t \, Q, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
-    & \sum_{\substack{{w'\in \mathcal{W}}\\{i':d_{i'j}\le d_{ij}}}} y^t_{w'i'jk} \geq \delta_{wijk}^t \, M_{jk}^t, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
+    & \sum_{\substack{{w'\in \mathcal{W}}\\{i':d_{i'j}< d_{ij}}}} y^t_{w'i'jk} \geq \delta_{wijk}^t \, M_{jk}^t, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
     & x_{ijk}^t = \sum_{w\in \mathcal{W}} y_{wijk}^t, & \quad \forall i,j,k\in \mathcal{N};t\in [T]\\[4pt]
     & \hat{m}_{ij}^t \ge 0,\,
     p_{ij} \geq 0,\,
@@ -298,11 +298,59 @@ Constraint (26) denotes that if $\delta_{wijk}^t=1$, then job $jk$ is full with 
 To prove this, we need to prove that any feasible matching will satisfy the constraints (30)-(32)\cite{baiou2000stable} below:
 \begin{itemize}
     \item Constraint (30):
+    Since that the available jobs set $\mathcal{M}^t$ is a subset of the set of all jobs $\mathcal{M}$, we have
+    \begin{align*}
+    & \sum_{jk\in \mathcal{M}^t}\sum_{i\in \mathcal{N}}y_{wijk}^t \le \sum_{jk\in \mathcal{M}}\sum_{i\in \mathcal{N}}y_{wijk}^t \le 1 & \forall w\in \mathcal{W}
+    \end{align*}
+    which directly implies constraint (30);
     
     \item Constraint (31):
+    Since that the available workers set $\mathcal{W}^t$ is a subset of the set of all jobs $\mathcal{W}$, we have
+    \begin{align*}
+    & \sum_{w\in \mathcal{W}^t}\sum_{i\in \mathcal{N}}y_{wijk}^t \le \sum_{w\in \mathcal{W}}\sum_{i\in \mathcal{N}}y_{wijk}^t \le M^t_{jk} & \forall jk\in \mathcal{M}
+    \end{align*}
+    which directly implies constraint (31);
     
     \item Constraint (32):
+    Instead of constraint (32), we try to prove a stronger proposition:
+    \begin{align*}
+        M_{jk}^t \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'j'k'}^t) \le \sum_{w'\in T}\, \sum_{i'\in \mathcal{N}}y_{w'i'jk}^t && \forall w\in \mathcal{W},jk\in \mathcal{M}
+    \end{align*}
+    where $S$ is the set of jobs that are \textbf{better or equal} than job $jk$ for worker $w$ at $i$, and $T$ is the set of workers that are \textbf{strictly better} than worker $w$ at $i$ for job $jk$. Both sets $S$ and $T$ are determined by $w$ the worker, $i$ the location of the worker, and $jk$ the job.
+
+    By the definition of set $T$ and constraint (26), we have that for all $w,j,k$,
+    \[
+    RHS = \sum_{
+    \substack{
+    {w'\in \mathcal{W}} \\ {i':d_{i'j}<d_{ij}}
+        }
+    }y_{w'i'jk}^t \ge \delta_{wijk}^t M_{jk}^t.
+    \]
     
+    Thus to prove the proposition, we need to show that for all job $jk$, $w$ and its location $i$,
+    \[
+    \delta_{wijk}^t M_{jk}^t \ge M_{jk}^t \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t)
+    \]
+
+    This naturally holds when $jk$ is not an available job at time $t$ and therefore $M_{jk}^t=0$. When $jk$ is available at time $t$ and $M_{jk}^t\neq0$, we need to show that
+    \[
+    \delta_{wijk}^t \ge \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t)
+    \]
+
+    This requires us to prove that if $\delta_{wijk}^t=0$, then 
+    \[
+    \sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t=1
+    \]
+    must hold for all $w,i,jk$.
+
+    In fact, when $\delta_{wijk}^t=0$, constraint (25) is equivalent to 
+    \[
+    u_{wi}^t \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t
+    \]
+    By the definition of $u_{wi}^t$, this is further equivalent to
+    \[
+    \sum_{j,k\in \mathcal{N}} y_{wijk}^t \left( p_{jk} - d_{ij} - c_{jk} \right) \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t
+    \]
 \end{itemize}
 
 \newpage
