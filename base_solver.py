@@ -264,6 +264,7 @@ def build_and_solve(
 
                         # Blocking Pair Condition
                         # sum_{w', i' better} y >= delta * M
+                        # 对worker w, job (j,k) and current location i, 找到所有更优的(worker, location) pair (w', i')，y[w', i', j, k, t]的和要大于等于 delta[w,i,j,k,t]*M_pool[j,k,t]
                         # Job preference (strict):
                         # - Smaller pickup distance d[i',j] is strictly better.
                         # - Tie-break (same location only): if i' == i and d equal, smaller worker id wins.

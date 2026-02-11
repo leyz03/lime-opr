@@ -84,3 +84,27 @@ Use this section to record each update's idea and result.
 - Changes:
   - `d[i',j] < d[i,j]` 一定更优先
   - 若 `i' == i` 且 d 相等，则 `w' < w`（worker id 更小）更优先
+
+### 2026-02-11 (Separation-based Stability via Lazy Constraints)
+- Idea:
+  - 将稳定性约束从主模型中移出，改为在发现 blocking pair 时按需加入，减少初始模型约束规模并加速求解。
+  - 由于 Gurobi 回调只能添加线性约束，将原有双线性稳定性约束改写为 big-M 线性蕴含形式。
+- Changes:
+  - 在 `seperation_solver.py` 新增 `MIPSOL` 回调 `_stability_lazy_cb(...)`，检测 `(w,i,j,k,t)` 的 blocking 条件并调用 `cbLazy`。
+  - 删除主模型中原先两条稳定性约束：
+    - `u >= (p - d - c) * l - Q * delta`
+    - `lhs_blocking >= delta * M_pool`
+  - 改为回调内的线性化约束：
+    - `u[w,i,t] >= p[j,k]-d[i,j]-c[j,k]-Q*delta[w,i,j,k,t]-Mu*(1-l[w,i,t])`
+    - `lhs_blocking_expr + M_pool_ub*(1-delta[w,i,j,k,t]) >= M_pool[j,k,t]`
+  - 设置并使用稳定的 big-M 常数：
+    - `u` 下界：`u_lb = -(max_d + max_c)`
+    - `Mu = price_ub + max_d + max_c`
+    - `M_pool_ub = sum_i (A_init[i] + U_init[i])`
+  - 启用回调相关参数：
+    - `m.Params.LazyConstraints = 1`
+    - `m.Params.PreCrush = 1`
+  - 预计算 `better_pairs[(w,i,j)]`，并用 `m._added_stability` 防止重复添加同一 lazy 约束。
+- Result:
+  - `seperation_solver.py` 语法检查通过（`py_compile`）。
+  - 短时求解冒烟测试可运行到时间上限，无回调报错（`status=9` under time limit）。

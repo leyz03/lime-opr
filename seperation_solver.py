@@ -21,6 +21,84 @@ class SolveResult:
     diag_stability_summary: Optional[str] = None
 
 
+def _stability_lazy_cb(model: gp.Model, where: int) -> None:
+    if where != GRB.Callback.MIPSOL:
+        return
+
+    eps = 1e-6
+    Nodes = model._Nodes
+    Workers = model._Workers
+    Time = model._Time
+    d = model._d
+    c = model._c
+
+    y = model._y
+    l = model._l
+    u = model._u
+    delta = model._delta
+    p = model._p
+    M_pool = model._M_pool
+
+    Mu = model._Mu
+    M_pool_ub = model._M_pool_ub
+    better_pairs = model._better_pairs
+    added = model._added_stability
+
+    for t in Time:
+        loc_by_worker = {}
+        for w in Workers:
+            for i in Nodes:
+                if model.cbGetSolution(l[w, i, t]) > 0.5:
+                    loc_by_worker[w] = i
+                    break
+
+        for w, i in loc_by_worker.items():
+            u_cur = float(model.cbGetSolution(u[w, i, t]))
+
+            best_pair = None
+            best_v = u_cur + eps
+            for j in Nodes:
+                for k in Nodes:
+                    cap = float(model.cbGetSolution(M_pool[j, k, t]))
+                    if cap <= 0.5:
+                        continue
+                    v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
+                    if v_alt > best_v:
+                        best_v = v_alt
+                        best_pair = (j, k, cap)
+
+            if best_pair is None:
+                continue
+
+            j, k, cap = best_pair
+
+            lhs_blocking_val = 0.0
+            for w2, i2 in loc_by_worker.items():
+                if (w2, i2) not in better_pairs[(w, i, j)]:
+                    continue
+                lhs_blocking_val += float(model.cbGetSolution(y[w2, i2, j, k, t]))
+
+            if not (best_v > u_cur + eps and lhs_blocking_val + eps < cap):
+                continue
+
+            key = (w, i, j, k, t)
+            if key in added:
+                continue
+            added.add(key)
+
+            model.cbLazy(
+                u[w, i, t]
+                >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
+            )
+
+            lhs_blocking_expr = gp.LinExpr()
+            for w2, i2 in better_pairs[(w, i, j)]:
+                lhs_blocking_expr += y[w2, i2, j, k, t]
+            model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+
+            return
+
+
 def build_and_solve(
     scenario: Dict[str, Any],
     *,
@@ -53,6 +131,11 @@ def build_and_solve(
     W_init = scenario["W_init"]
     l_init = scenario["l_init"]
     price_ub = scenario["price_ub"]
+    max_d = max(float(d[i, j]) for i in Nodes for j in Nodes)
+    max_c = max(float(c[i, j]) for i in Nodes for j in Nodes)
+    u_lb = -(max_d + max_c)
+    Mu = float(price_ub) + max_d + max_c
+    M_pool_ub = float(sum(A_init[i] + U_init[i] for i in Nodes))
 
     # ==========================================
     # Model Formulation
@@ -61,6 +144,8 @@ def build_and_solve(
     m.Params.NonConvex = 2  # 允许非凸二次约束 (alpha * A, p * m)
     m.Params.OutputFlag = int(output_flag)
     m.Params.Seed = 1
+    m.Params.LazyConstraints = 1
+    m.Params.PreCrush = 1
     if time_limit is not None:
         m.Params.TimeLimit = float(time_limit)
     if mip_gap is not None:
@@ -88,9 +173,7 @@ def build_and_solve(
 
     y = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y")  # Specific assignment
     l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")  # Availability
-    # NOTE: utility can be negative (e.g., low price/high travel time). If you keep lb=0
-    # you silently rule out negative-profit assignments.
-    u = m.addVars(Workers, Nodes, Time, lb=-GRB.INFINITY, name="u")
+    u = m.addVars(Workers, Nodes, Time, lb=u_lb, name="u")
     delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
 
     # Pricing & Control
@@ -256,26 +339,6 @@ def build_and_solve(
                 val = gp.quicksum(y[w, i, j, k, t] * (p[j, k] - d[i, j] - c[j, k]) for j in Nodes for k in Nodes)
                 m.addConstr(u[w, i, t] == val)
 
-                # Stability
-                for j in Nodes:
-                    for k in Nodes:
-                        rhs = (p[j, k] - d[i, j] - c[j, k]) * l[w, i, t] - delta[w, i, j, k, t] * Q
-                        m.addConstr(u[w, i, t] >= rhs)
-
-                        # Blocking Pair Condition 
-                        # sum_{w', i' better} y >= delta * M
-                        # Job preference (strict):
-                        # - Smaller pickup distance d[i',j] is strictly better.
-                        # - Tie-break (same location only): if i' == i and d equal, smaller worker id wins.
-                        lhs_blocking = 0
-                        for w_prime in Workers:
-                            for i_prime in Nodes:
-                                if (d[i_prime, j] < d[i, j]) or (
-                                    d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
-                                ):
-                                    lhs_blocking += y[w_prime, i_prime, j, k, t]
-                        m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
-
         # x = sum y
         for i in Nodes:
             for j in Nodes:
@@ -297,11 +360,41 @@ def build_and_solve(
 
     m.setObjective(obj, GRB.MAXIMIZE)
 
+    better_pairs = {}
+    for w in Workers:
+        for i in Nodes:
+            for j in Nodes:
+                pairs = []
+                for w_prime in Workers:
+                    for i_prime in Nodes:
+                        if (d[i_prime, j] < d[i, j]) or (
+                            d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
+                        ):
+                            pairs.append((w_prime, i_prime))
+                better_pairs[(w, i, j)] = pairs
+
+    m._Nodes = Nodes
+    m._Workers = Workers
+    m._Time = Time
+    m._d = d
+    m._c = c
+    m._Q = Q
+    m._Mu = Mu
+    m._M_pool_ub = M_pool_ub
+    m._y = y
+    m._l = l
+    m._u = u
+    m._delta = delta
+    m._p = p
+    m._M_pool = M_pool
+    m._better_pairs = better_pairs
+    m._added_stability = set()
+
     # ==========================================
     # Solve
     # ==========================================
     start_time = time.time()
-    m.optimize()
+    m.optimize(_stability_lazy_cb)
     end_time = time.time()
 
     res = SolveResult(
