@@ -301,12 +301,18 @@ class LinearScenarioConfig:
     phi_slope: float = 0.01
     phi_min: float = 0.0
     phi_max: float = 0.60
+    # Optional direct override for phi matrix, shape (n_nodes, n_nodes).
+    # If provided, this takes precedence over linear-distance phi generation.
+    phi_override: Optional[List[List[float]]] = None
 
     # Economics
     revenue_level: float = 20.0
     penalty_Cp: float = 50.0
     price_ub: float = 100.0
     bigM_Q: float = 10000.0
+    # Optional testing knob: enforce p[j,k] >= price_lb_for_test in solver.
+    # Leave as None in production runs.
+    price_lb_for_test: Optional[float] = None
 
     # Initial states
     initial_backlog_level: int = 0
@@ -389,6 +395,13 @@ def generate_linear_distance_scenario(cfg: LinearScenarioConfig, seed: int = 0) 
             d[(i, j)] = int(max(0, round(dij)))
             c[(i, j)] = int(max(0, round(cij)))
             phi[(i, j)] = float(np.clip(phij, cfg.phi_min, cfg.phi_max))
+
+    if cfg.phi_override is not None:
+        if len(cfg.phi_override) != n or any(len(row) != n for row in cfg.phi_override):
+            raise ValueError("phi_override must have shape (n_nodes, n_nodes).")
+        for i in Nodes:
+            for j in Nodes:
+                phi[(i, j)] = float(np.clip(float(cfg.phi_override[i][j]), 0.0, 1.0))
 
     if cfg.enforce_integer_lags:
         if any(v < 0 for v in d.values()) or any(v < 0 for v in c.values()):

@@ -38,3 +38,53 @@ Date: 2026-02-12
 - Ran a minimal direct checker smoke test (without Gurobi):
   - Constructed a tiny synthetic scenario and called `check_aggregate_stability(...)`.
   - Result: function executed successfully and reported expected blocking pair(s).
+
+## 5) Follow-up Fixes (`base_solver.py`)
+- Restored micro-macro linking:
+  - `x[i,j,k,t] == sum_w y[w,i,j,k,t]`
+  - Removed accidental `break` that disabled this link.
+- Removed leftover debug trap:
+  - Deleted `breakpoint()` in diagnostics stage.
+- Re-enabled blocking-pair stability constraints as default model constraints.
+
+## 6) Follow-up Verification
+- Ran syntax check:
+  - `python -m py_compile base_solver.py diagnostics.py`
+- Result: passed.
+- End-to-end runs are not executable in this environment due missing `gurobipy` (`ModuleNotFoundError`).
+
+## 7) Config-based Stability Testing Update
+- Updated `configs/test.json` to be a dedicated stability-diagnostics test setup:
+  - Small deterministic geometry (`n_nodes=3`, fixed coords) for reproducible distances.
+  - Persistent backlog (`initial_backlog_level=3`) to keep task capacity active.
+  - Config-level price floor (`price_lb_for_test=6.0`) so alternative utility is meaningful without any CLI price argument.
+- Later moved all testing toggles into `test_solver.py`; `base_solver.py` is now kept as a clean solver entrypoint.
+
+## 8) Known-Optimum Note (Superseded)
+- Previous 1-node baseline note is superseded by the new 2-node test configs in Section 9.
+- `configs/known_optimal_one_node.json` is now repurposed as the 2-node rebalance-stress case.
+
+## 9) Two 2-Node Test Configs (Revised per request)
+- Replaced `configs/known_optimal_one_node.json` with a 2-node, imbalance case:
+  - Node 0 demand is persistently high (`base_demand_by_node=[9.0, 1.0]`).
+  - Intended behavior: continuous pressure to rebalance/relocate bikes toward node 0.
+- Added `configs/known_optimal_two_node_repair.json` as the repair-stress case:
+  - Demand is uniform (`base_demand_by_node=[5.0, 5.0]`).
+  - Trips ending at node 1 are forced to fail via `phi_override=[[0.0, 1.0], [0.0, 1.0]]`.
+  - Intended behavior: persistent accumulation in unusable state tied to node 1 arrivals, requiring repeated repair handling.
+- Extended config schema to support directed failure matrices:
+  - `LinearScenarioConfig.phi_override` (optional `n_nodes x n_nodes` matrix).
+  - When provided, this overrides distance-based `phi` generation.
+
+## 10) New `test_solver.py` and Base Solver Rollback
+- Added `test_solver.py` as a dedicated testing entrypoint with:
+  - Full per-time variable dumps (`A/U/W_count/Y_i/L_i/F/F_bar/alpha`, matrices `m_hat/m_tilde/M_pool`, flows `x`, assignments `y`, worker states `l`, utilities `u`, and static `p`).
+  - Stability diagnostics via `check_aggregate_stability`.
+  - Basic invariant checks via `check_basic_invariants`.
+  - Known-optimal objective check via:
+    - `--check_known_optimal --expected_obj ...`, or
+    - top-level `expected_obj` field in config JSON.
+- Rolled `base_solver.py` back to non-testing form:
+  - Removed CLI test switches (`--disable_stability_constraints`, etc.).
+  - Removed test-only function parameters (`enable_stability_constraints`, `price_lb_for_test`).
+  - Kept solver model and diagnostics behavior intact.

@@ -262,12 +262,8 @@ def build_and_solve(
                         rhs = (p[j, k] - d[i, j] - c[j, k]) * l[w, i, t] - delta[w, i, j, k, t] * Q
                         m.addConstr(u[w, i, t] >= rhs)
 
-                        # Blocking Pair Condition
-                        # sum_{w', i' better} y >= delta * M
-                        # 对worker w, job (j,k) and current location i, 找到所有更优的(worker, location) pair (w', i')，y[w', i', j, k, t]的和要大于等于 delta[w,i,j,k,t]*M_pool[j,k,t]
-                        # Job preference (strict):
-                        # - Smaller pickup distance d[i',j] is strictly better.
-                        # - Tie-break (same location only): if i' == i and d equal, smaller worker id wins.
+                        # Blocking Pair Condition:
+                        # sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t] >= delta[w,i,j,k,t] * M_pool[j,k,t]
                         lhs_blocking = 0
                         for w_prime in Workers:
                             for i_prime in Nodes:
@@ -275,14 +271,13 @@ def build_and_solve(
                                     d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
                                 ):
                                     lhs_blocking += y[w_prime, i_prime, j, k, t]
-                        #m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
+                        m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
 
         # x = sum y
         for i in Nodes:
             for j in Nodes:
                 for k in Nodes:
-                    break
-                    #m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
+                    m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
 
     # --- Objective ---
     obj = 0
@@ -334,6 +329,7 @@ def build_and_solve(
             "l": l,
             "u": u,
         }
+
         rep_basic = check_basic_invariants(scenario, varpack, tol=1e-6, check_bilinear_min=check_min_mech)
         res.diag_basic_ok = bool(rep_basic.ok)
         res.diag_basic_summary = rep_basic.summarize(max_items=30)
