@@ -44,64 +44,49 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
     better_pairs = model._better_pairs
     added = model._added_stability
 
-    # Step 1: Extract current solution and identify blocking pairs
+    # Mirror diagnostics.check_aggregate_stability:
+    # a blocking pair (w,i,j,k,t) exists iff:
+    #   1) l[w,i,t] == 1
+    #   2) v_alt = p[j,k] - d[i,j] - c[j,k] > u[w,i,t]
+    #   3) sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t] < M_pool[j,k,t]
     for t in Time:
-        loc_by_worker = {}
         for w in Workers:
             for i in Nodes:
-                if model.cbGetSolution(l[w, i, t]) > 0.5:
-                    loc_by_worker[w] = i
-                    break
-        
-        # step 2: For each worker, check if there's a blocking pair (j,k) that would give them strictly higher utility and is feasible given the current matching and capacity.
-        for w, i in loc_by_worker.items():
-            u_cur = float(model.cbGetSolution(u[w, i, t]))
-
-            best_pair = None
-            best_v = u_cur + eps
-            for j in Nodes:
-                for k in Nodes:
-                    cap = float(model.cbGetSolution(M_pool[j, k, t]))
-                    if cap <= 0.5:
-                        continue
-                    # calculate the utility if worker w were to be assigned to another job (j,k)
-                    v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
-                    if v_alt > best_v: # best alternative utility?
-                        best_v = v_alt
-                        best_pair = (j, k, cap)
-
-            if best_pair is None:
-                continue
-
-            j, k, cap = best_pair
-
-            # check blocking pair condition: other workers have been assigned to this job (j,k) in the current solution, and if we reassign them to their next best alternatives, would the capacity constraint still be violated?
-            lhs_blocking_val = 0.0
-            for w2, i2 in loc_by_worker.items():
-                if (w2, i2) not in better_pairs[(w, i, j)]:
+                if float(model.cbGetSolution(l[w, i, t])) <= 0.5:
                     continue
-                lhs_blocking_val += float(model.cbGetSolution(y[w2, i2, j, k, t]))
 
-            # decide whether to add a lazy constraint 
-            if not (best_v > u_cur + eps and lhs_blocking_val + eps < cap):
-                continue
+                u_cur = float(model.cbGetSolution(u[w, i, t]))
+                for j in Nodes:
+                    better = better_pairs[(w, i, j)]
+                    for k in Nodes:
+                        cap = float(model.cbGetSolution(M_pool[j, k, t]))
+                        v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
+                        if v_alt <= u_cur + eps:
+                            continue
 
-            key = (w, i, j, k, t)
-            if key in added:
-                continue
-            added.add(key)
+                        lhs_blocking_val = 0.0
+                        for w2, i2 in better:
+                            lhs_blocking_val += float(model.cbGetSolution(y[w2, i2, j, k, t]))
 
-            model.cbLazy(
-                u[w, i, t]
-                >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
-            )
+                        if lhs_blocking_val >= cap - eps:
+                            continue
 
-            lhs_blocking_expr = gp.LinExpr()
-            for w2, i2 in better_pairs[(w, i, j)]:
-                lhs_blocking_expr += y[w2, i2, j, k, t]
-            model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+                        key = (w, i, j, k, t)
+                        if key in added:
+                            continue
+                        added.add(key)
 
-            return
+                        model.cbLazy(
+                            u[w, i, t]
+                            >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
+                        )
+
+                        lhs_blocking_expr = gp.LinExpr()
+                        for w2, i2 in better:
+                            lhs_blocking_expr += y[w2, i2, j, k, t]
+                        model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+
+                        return
 
 
 def build_and_solve(
