@@ -138,7 +138,6 @@ def build_and_solve(
     price_ub = scenario["price_ub"]
     max_d = max(float(d[i, j]) for i in Nodes for j in Nodes)
     max_c = max(float(c[i, j]) for i in Nodes for j in Nodes)
-    u_lb = -(max_d + max_c)
     Mu = float(price_ub) + max_d + max_c
     M_pool_ub = float(sum(A_init[i] + U_init[i] for i in Nodes))
 
@@ -178,7 +177,7 @@ def build_and_solve(
 
     y = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y")  # Specific assignment
     l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")  # Availability
-    u = m.addVars(Workers, Nodes, Time, lb=u_lb, name="u")
+    u = m.addVars(Workers, Nodes, Time, lb=0, name="u")
     delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
 
     # Pricing & Control

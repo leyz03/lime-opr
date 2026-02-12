@@ -297,6 +297,8 @@ class LinearScenarioConfig:
     d_slope: float = 0.10
     c_base: float = 1.0
     c_slope: float = 0.10
+    # Constant service time for same-node tasks (i==j), non-zero by design.
+    c_diag_constant: float = 1.0
     phi_base: float = 0.05
     phi_slope: float = 0.01
     phi_min: float = 0.0
@@ -389,11 +391,18 @@ def generate_linear_distance_scenario(cfg: LinearScenarioConfig, seed: int = 0) 
     for i in Nodes:
         for j in Nodes:
             dij = cfg.d_base + cfg.d_slope * dist[(i, j)]
-            cij = cfg.c_base + cfg.c_slope * dist[(i, j)]
+            # c_ii uses a fixed constant instead of distance-proportional form.
+            if i == j:
+                cij = cfg.c_diag_constant
+            else:
+                cij = cfg.c_base + cfg.c_slope * dist[(i, j)]
             phij = cfg.phi_base + cfg.phi_slope * dist[(i, j)]
 
             d[(i, j)] = int(max(0, round(dij)))
-            c[(i, j)] = int(max(0, round(cij)))
+            if i == j:
+                c[(i, j)] = int(max(3, round(cij)))
+            else:
+                c[(i, j)] = int(max(0, round(cij)))
             phi[(i, j)] = float(np.clip(phij, cfg.phi_min, cfg.phi_max))
 
     if cfg.phi_override is not None:

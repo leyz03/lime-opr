@@ -15,7 +15,7 @@
     "d_slope": 0.08,
     "c_base": 0.2,
     "c_slope": 0.08,
-    "phi_base": 0.0,
+    "phi_base": 0.1,
     "phi_slope": 0.0,
     "phi_min": 0.0,
     "phi_max": 0.0,

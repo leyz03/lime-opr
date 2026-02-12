@@ -293,7 +293,7 @@ def build_and_test(
 
     y = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y")
     l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")
-    u = m.addVars(Workers, Nodes, Time, lb=-GRB.INFINITY, name="u")
+    u = m.addVars(Workers, Nodes, Time, lb=0, name="u")
     delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
 
     p = m.addVars(Nodes, Nodes, lb=0, ub=price_ub, name="p")

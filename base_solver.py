@@ -90,7 +90,7 @@ def build_and_solve(
     l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")  # Availability
     # NOTE: utility can be negative (e.g., low price/high travel time). If you keep lb=0
     # you silently rule out negative-profit assignments.
-    u = m.addVars(Workers, Nodes, Time, lb=-GRB.INFINITY, name="u")
+    u = m.addVars(Workers, Nodes, Time, lb=0, name="u")
     delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
 
     # Pricing & Control
