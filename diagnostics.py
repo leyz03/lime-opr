@@ -200,81 +200,77 @@ def check_aggregate_stability(
     scenario: Dict[str, Any],
     vars: Dict[str, Any],
     tol: float = 1e-6,
-    only_positive_profit: bool = True,
+    only_positive_profit: bool = False,
 ) -> DiagReport:
-    """Independent stability checker using aggregate variables.
+    """Stability checker using the exact blocking-pair logic on (w, i, j, k, t).
 
-    Preference model assumed (matches your constraints):
-      - Worker at i prefers job (j,k) if profit = p[j,k] - d[i,j] - c[j,k] is larger.
-      - Job (j,k) prefers workers with smaller d[i,j] (closer pickup).
-      - Capacity of job slots is the available task count M_pool[j,k,t].
+    Required vars in `vars`:
+      - y[w,i,j,k,t], l[w,i,t], u[w,i,t], p[j,k], M_pool[j,k,t]
 
-    A blocking situation exists if there is at least one *idle* worker at node i
-    who can strictly improve by taking (j,k), and either:
-      (a) assigned(j,k,t) < capacity(j,k,t), or
-      (b) assigned is full but includes workers from strictly worse distance.
-
-    This is an aggregate check. It will not catch errors that depend purely on
-    worker identity (if you later add heterogeneous worker preferences).
+    For each worker-location-time (w,i,t) and candidate task (j,k):
+      1) cap = M_pool[j,k,t]
+      2) v_alt = p[j,k] - d[i,j] - c[j,k]
+      3) skip if v_alt <= u_cur + tol (worker does not strictly prefer deviating)
+      4) lhs = sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t]
+      5) skip if lhs >= cap - tol (task fully occupied by better workers)
+      6) otherwise (w,i,j,k,t) is a blocking pair.
     """
     Nodes: List[int] = scenario["Nodes"]
+    Workers: List[int] = scenario["Workers"]
     Time: List[int] = scenario["Time"]
     d = scenario["d"]
     c = scenario["c"]
 
-    x = vars["x"]
-    W_count = vars["W_count"]
-    M_pool = vars["M_pool"]
+    y = vars["y"]
+    l = vars["l"]
+    u = vars["u"]
     p = vars["p"]
+    M_pool = vars["M_pool"]
 
     issues: List[DiagIssue] = []
 
-    for t in Time:
-        # idle workers per node (aggregate)
-        idle = {}
+    better_pairs: Dict[Tuple[int, int, int], List[Tuple[int, int]]] = {}
+    for w in Workers:
         for i in Nodes:
-            leaving = sum(_val(x[i, j, k, t]) for j in Nodes for k in Nodes)
-            idle_i = _val(W_count[i, t]) - leaving
-            idle[i] = idle_i
-
-        for i in Nodes:
-            if idle[i] <= 0.5:  # tolerate rounding
-                continue
             for j in Nodes:
-                for k in Nodes:
-                    profit = _val(p[j, k]) - float(d[i, j]) - float(c[j, k])
-                    if only_positive_profit and profit <= 1e-9:
-                        continue
-
-                    cap = _val(M_pool[j, k, t])
-                    assigned = sum(_val(x[i2, j, k, t]) for i2 in Nodes)
-
-                    if assigned + 1e-6 < cap:
-                        issues.append(
-                            DiagIssue(
-                                "stability",
-                                "Idle worker can take available task (capacity not full)",
-                                (i, j, k, t),
-                                lhs=assigned,
-                                rhs=cap,
-                            )
-                        )
-                        continue
-
-                    # capacity is (approximately) full: check if someone farther is assigned
-                    worst_dist = None
+                pairs: List[Tuple[int, int]] = []
+                for w2 in Workers:
                     for i2 in Nodes:
-                        if _val(x[i2, j, k, t]) > 0.5:
-                            dist = float(d[i2, j])
-                            worst_dist = dist if worst_dist is None else max(worst_dist, dist)
-                    if worst_dist is not None and float(d[i, j]) + 1e-9 < worst_dist:
+                        if (d[i2, j] < d[i, j]) or (d[i2, j] == d[i, j] and i2 == i and w2 < w):
+                            pairs.append((w2, i2))
+                better_pairs[(w, i, j)] = pairs
+
+    for t in Time:
+        for w in Workers:
+            for i in Nodes:
+                # Skip if worker w at location i cannot work
+                if _val(l[w, i, t]) <= 0.5:
+                    continue
+                # current utility for worker w at location i and time t
+                u_cur = _val(u[w, i, t])
+                for j in Nodes:
+                    for k in Nodes:
+                        cap = _val(M_pool[j, k, t])
+                        v_alt = _val(p[j, k]) - float(d[i, j]) - float(c[j, k])
+                        if v_alt <= u_cur + tol:
+                            continue
+                        if only_positive_profit and v_alt <= tol:
+                            continue
+
+                        lhs_blocking_val = 0.0
+                        for w2, i2 in better_pairs[(w, i, j)]:
+                            lhs_blocking_val += _val(y[w2, i2, j, k, t])
+
+                        if lhs_blocking_val >= cap - tol:
+                            continue
+
                         issues.append(
                             DiagIssue(
                                 "stability",
-                                "Idle worker is closer than some assigned worker (blocking by replacement)",
-                                (i, j, k, t),
-                                lhs=float(d[i, j]),
-                                rhs=worst_dist,
+                                "Blocking pair found (strict preference + insufficient better-worker occupancy)",
+                                (w, i, j, k, t),
+                                lhs=lhs_blocking_val,
+                                rhs=cap,
                             )
                         )
 

@@ -305,7 +305,7 @@ class LinearScenarioConfig:
     # Economics
     revenue_level: float = 20.0
     penalty_Cp: float = 50.0
-    price_ub: float = 10.0
+    price_ub: float = 100.0
     bigM_Q: float = 10000.0
 
     # Initial states

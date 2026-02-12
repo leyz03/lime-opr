@@ -44,6 +44,7 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
     better_pairs = model._better_pairs
     added = model._added_stability
 
+    # Step 1: Extract current solution and identify blocking pairs
     for t in Time:
         loc_by_worker = {}
         for w in Workers:
@@ -51,7 +52,8 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
                 if model.cbGetSolution(l[w, i, t]) > 0.5:
                     loc_by_worker[w] = i
                     break
-
+        
+        # step 2: For each worker, check if there's a blocking pair (j,k) that would give them strictly higher utility and is feasible given the current matching and capacity.
         for w, i in loc_by_worker.items():
             u_cur = float(model.cbGetSolution(u[w, i, t]))
 
@@ -62,8 +64,9 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
                     cap = float(model.cbGetSolution(M_pool[j, k, t]))
                     if cap <= 0.5:
                         continue
+                    # calculate the utility if worker w were to be assigned to another job (j,k)
                     v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
-                    if v_alt > best_v:
+                    if v_alt > best_v: # best alternative utility?
                         best_v = v_alt
                         best_pair = (j, k, cap)
 
@@ -72,12 +75,14 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
 
             j, k, cap = best_pair
 
+            # check blocking pair condition: other workers have been assigned to this job (j,k) in the current solution, and if we reassign them to their next best alternatives, would the capacity constraint still be violated?
             lhs_blocking_val = 0.0
             for w2, i2 in loc_by_worker.items():
                 if (w2, i2) not in better_pairs[(w, i, j)]:
                     continue
                 lhs_blocking_val += float(model.cbGetSolution(y[w2, i2, j, k, t]))
 
+            # decide whether to add a lazy constraint 
             if not (best_v > u_cur + eps and lhs_blocking_val + eps < cap):
                 continue
 
@@ -421,13 +426,16 @@ def build_and_solve(
             "x": x,
             "W_count": W_count,
             "p": p,
+            "y": y,
+            "l": l,
+            "u": u,
         }
         rep_basic = check_basic_invariants(scenario, varpack, tol=1e-6, check_bilinear_min=check_min_mech)
         res.diag_basic_ok = bool(rep_basic.ok)
         res.diag_basic_summary = rep_basic.summarize(max_items=30)
 
         if check_stability:
-            rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=True)
+            rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=False)
             res.diag_stability_ok = bool(rep_stab.ok)
             res.diag_stability_summary = rep_stab.summarize(max_items=30)
 

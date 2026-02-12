@@ -275,13 +275,14 @@ def build_and_solve(
                                     d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
                                 ):
                                     lhs_blocking += y[w_prime, i_prime, j, k, t]
-                        m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
+                        #m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
 
         # x = sum y
         for i in Nodes:
             for j in Nodes:
                 for k in Nodes:
-                    m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
+                    break
+                    #m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
 
     # --- Objective ---
     obj = 0
@@ -329,13 +330,16 @@ def build_and_solve(
             "x": x,
             "W_count": W_count,
             "p": p,
+            "y": y,
+            "l": l,
+            "u": u,
         }
         rep_basic = check_basic_invariants(scenario, varpack, tol=1e-6, check_bilinear_min=check_min_mech)
         res.diag_basic_ok = bool(rep_basic.ok)
         res.diag_basic_summary = rep_basic.summarize(max_items=30)
 
         if check_stability:
-            rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=True)
+            rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=False)
             res.diag_stability_ok = bool(rep_stab.ok)
             res.diag_stability_summary = rep_stab.summarize(max_items=30)
 
