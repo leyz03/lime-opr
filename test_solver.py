@@ -29,10 +29,40 @@ class TestSolveResult:
 
 
 def _v(x) -> float:
-    try:
-        return float(x.X)  # type: ignore[attr-defined]
-    except Exception:
+    if isinstance(x, (int, float)):
         return float(x)
+
+    # Common Gurobi path (works in most environments).
+    for name in ("X", "x", "Xn"):
+        try:
+            return float(getattr(x, name))
+        except Exception:
+            pass
+
+    # Gurobi objects: explicit attribute queries as fallback.
+    if hasattr(x, "getAttr"):
+        for attr in ("X", "Xn", "x"):
+            try:
+                return float(x.getAttr(attr))
+            except Exception:
+                pass
+        try:
+            return float(x.getAttr(GRB.Attr.X))
+        except Exception:
+            pass
+
+    # Expression-like objects may expose getValue().
+    if hasattr(x, "getValue"):
+        try:
+            return float(x.getValue())
+        except Exception:
+            pass
+
+    # Last resort.
+    try:
+        return float(x)
+    except Exception as exc:
+        raise TypeError(f"Cannot extract numeric value from object of type {type(x)}") from exc
 
 
 def _matrix_to_str(data: Dict[tuple[int, int], float], nodes: list[int], precision: int = 2) -> str:
@@ -126,6 +156,75 @@ def _print_solution_by_time(scenario: Dict[str, Any], varpack: Dict[str, Any]) -
         for w in workers:
             vals = [round(_v(u[w, i, t]), 3) for i in nodes]
             print(f"  worker {w}: {vals}")
+
+
+def _print_epoch_task_summary(scenario: Dict[str, Any], varpack: Dict[str, Any]) -> None:
+    nodes = scenario["Nodes"]
+    time_idx = scenario["Time"]
+    t_max = scenario["T_max"]
+
+    D_i = scenario["D_i"]
+    Y_i = varpack["Y_i"]
+    L_i = varpack["L_i"]
+    m_hat = varpack["m_hat"]
+    m_tilde = varpack["m_tilde"]
+    M_pool = varpack["M_pool"]
+    F_bar = varpack["F_bar"]
+    A = varpack["A"]
+    U = varpack["U"]
+    p = varpack["p"]
+
+    print("\n--- Generated Prices (p_jk) ---")
+    any_price = False
+    for j in nodes:
+        for k in nodes:
+            pv = _v(p[j, k])
+            if pv > 1e-4:
+                any_price = True
+                action = "Swap" if j == k else "Rebalance"
+                print(f"Task {j}->{k} ({action}): {pv:.4f}")
+    if not any_price:
+        print("(all prices are ~0)")
+
+    print("\n--- Task Creation (m_hat) & Execution (m_tilde) ---")
+    for t in time_idx:
+        demand_total = sum(float(D_i[i, t]) for i in nodes)
+        served_total = sum(_v(Y_i[i, t]) for i in nodes)
+        lost_total = sum(_v(L_i[i, t]) for i in nodes)
+        posted_total = sum(_v(m_hat[j, k, t]) for j in nodes for k in nodes)
+        matched_total = sum(_v(m_tilde[j, k, t]) for j in nodes for k in nodes)
+        pool_start_total = sum(_v(M_pool[j, k, t]) for j in nodes for k in nodes)
+        failed_return_total = sum(_v(F_bar[j, t]) for j in nodes)
+
+        print(f"\nTime {t}:")
+        print(f"  demand={demand_total:.3f}, served={served_total:.3f}, lost={lost_total:.3f}")
+        print(
+            f"  pool_start={pool_start_total:.3f}, posted={posted_total:.3f}, "
+            f"executed={matched_total:.3f}, failed_returns(F_bar)={failed_return_total:.3f}"
+        )
+
+        any_line = False
+        for j in nodes:
+            for k in nodes:
+                v_hat = _v(m_hat[j, k, t])
+                v_tilde = _v(m_tilde[j, k, t])
+                v_pool = _v(M_pool[j, k, t])
+                if v_hat > 1e-4 or v_tilde > 1e-4 or v_pool > 1e-4:
+                    any_line = True
+                    print(
+                        f"  {j}->{k}: Posted(hat)={v_hat:.2f}, Pool(M)={v_pool:.2f}, Executed(tilde)={v_tilde:.2f}"
+                    )
+        if not any_line:
+            print("  (no task creation/execution/pool entries above threshold)")
+
+        if t < t_max - 1:
+            pool_next_total = sum(_v(M_pool[j, k, t + 1]) for j in nodes for k in nodes)
+            print(f"  pool_end(next M_pool at t+1)={pool_next_total:.3f}")
+
+    print("\n--- Inventory Status (A & U) ---")
+    for t in time_idx:
+        status = [f"Node {i}: A={_v(A[i, t]):.1f}, U={_v(U[i, t]):.1f}" for i in nodes]
+        print(f"Time {t}: " + " | ".join(status))
 
 
 def _read_expected_obj(config_path: str) -> Optional[float]:
@@ -348,6 +447,7 @@ def build_and_test(
     )
 
     varpack = {
+        "__model_ref": m,  # keep model alive for post-solve value access/printing
         "Y_i": Y_i,
         "Y_ij": Y_ij,
         "L_i": L_i,
@@ -417,6 +517,9 @@ def main() -> None:
         print(res.diag_basic_summary)
     if res.diag_stability_summary:
         print(res.diag_stability_summary)
+
+    if res.obj_val is not None:
+        _print_epoch_task_summary(scenario, varpack)
 
     if not args.no_print_time_vars and res.obj_val is not None:
         _print_solution_by_time(scenario, varpack)
