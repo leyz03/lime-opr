@@ -21,7 +21,7 @@
     "phi_max": 0.6,
     "revenue_level": 5.0,
     "penalty_Cp": 2.0,
-    "price_ub": 10.0,
+    "price_ub": 100.0,
     "bigM_Q": 10000.0,
     "initial_backlog_level": 0,
     "enforce_integer_lags": true

@@ -365,8 +365,7 @@ def main() -> None:
         f"seed={run_seed} status={res.status} runtime={res.runtime_sec:.2f}s obj={res.obj_val} gap={res.mip_gap} "
         f"vars={res.n_vars} constrs={res.n_constrs}"
     )
-    if res.diag_basic_summary:
-        print(res.diag_basic_summary)
+
     if res.diag_stability_summary:
         print(res.diag_stability_summary)
 
