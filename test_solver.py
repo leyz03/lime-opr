@@ -8,9 +8,11 @@ from gurobipy import GRB
 try:
     import base_solver
     import seperation_solver
+    import nested_solver
+    print("✅ Solvers (base_solver, seperation_solver, nested_solver) found.")
 except ImportError as e:
     print(f"Error importing solvers: {e}")
-    print("Please ensure 'base_solver.py' and 'seperation_solver.py' are in the current folder.")
+    print("Please ensure 'base_solver.py', 'seperation_solver.py', and 'nested_solver.py' are in the current folder.")
     sys.exit(1)
 
 # Note: We import config_generate to ensure it's accessible, 
@@ -145,20 +147,42 @@ def run_test():
         print(f"   -> ❌ FAILED: {e}")
         res_sep = None
 
-    # 4. Compare Results
+    # 4. Run Nested Solver
+    print("\n[Step 4] Running Nested Solver (Benders Decomposition)...")
+    try:
+        res_nested = nested_solver.build_and_solve(
+            scenario,
+            time_limit=30,
+            mip_gap=0.01,
+            output_flag=0,  # Silent mode
+            check_stability=True
+        )
+        print(f"   -> Status: {res_nested.status} (2=Optimal)")
+        print(f"   -> Objective: {res_nested.obj_val:.4f}")
+        print(f"   -> Runtime: {res_nested.runtime_sec:.4f}s")
+        print(f"   -> Constraints: {res_nested.n_constrs} (Initial constraints before cuts)")
+        print(f"   -> Stability Cuts Added: {res_nested.n_lazy_stability_cuts}")
+        print(f"   -> Physical Cuts Added: {res_nested.n_lazy_physical_cuts}")
+        if res_nested.diag_stability_ok is not None:
+             print(f"   -> Stability Check: {'✅ PASS' if res_nested.diag_stability_ok else '❌ FAIL'}")
+    except Exception as e:
+        print(f"   -> ❌ FAILED: {e}")
+        res_nested = None
+
+    # 5. Compare Results
     print("\n" + "="*60)
     print("📊  COMPARISON REPORT")
     print("="*60)
 
-    if res_base and res_sep:
+    if res_base and res_sep and res_nested and res_base.status == 2 and res_sep.status == 2 and res_nested.status == 2:
         # Check Objective Difference
         obj_diff = abs(res_base.obj_val - res_sep.obj_val)
         
-        print(f"{'Metric':<20} | {'Base (MILP)':<15} | {'Separation (Lazy)':<15}")
-        print("-" * 56)
-        print(f"{'Objective':<20} | {res_base.obj_val:<15.4f} | {res_sep.obj_val:<15.4f}")
-        print(f"{'Runtime':<20} | {res_base.runtime_sec:<15.4f} | {res_sep.runtime_sec:<15.4f}")
-        print(f"{'Variables':<20} | {res_base.n_vars:<15} | {res_sep.n_vars:<15}")
+        print(f"{'Metric':<20} | {'Base (MILP)':<15} | {'Separation (Lazy)':<15} | {'Nested (Benders)':<15}")
+        print("-" * 72)
+        print(f"{'Objective':<20} | {res_base.obj_val:<15.4f} | {res_sep.obj_val:<15.4f} | {res_nested.obj_val:<15.4f}")
+        print(f"{'Runtime':<20} | {res_base.runtime_sec:<15.4f} | {res_sep.runtime_sec:<15.4f} | {res_nested.runtime_sec:<15.4f}")
+        print(f"{'Variables':<20} | {res_base.n_vars:<15} | {res_sep.n_vars:<15} | {res_nested.n_vars:<15}")
         
         if obj_diff < 1e-4:
             print("\n✅ SUCCESS: Both solvers converged to the same optimal solution.")

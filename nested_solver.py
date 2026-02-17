@@ -6,7 +6,7 @@ import time
 
 import argparse
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 @dataclass
 class SolveResult:
     status: int
@@ -19,12 +19,11 @@ class SolveResult:
     diag_stability_ok: Optional[bool] = None
     diag_basic_summary: Optional[str] = None
     diag_stability_summary: Optional[str] = None
+    n_lazy_stability_cuts: int = 0
+    n_lazy_physical_cuts: int = 0
 
 
-def _stability_lazy_cb(model: gp.Model, where: int) -> None:
-    if where != GRB.Callback.MIPSOL:
-        return
-
+def _separate_stability_cuts(model: gp.Model) -> int:
     eps = 1e-6
     Nodes = model._Nodes
     Workers = model._Workers
@@ -43,6 +42,8 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
     M_pool_ub = model._M_pool_ub
     better_pairs = model._better_pairs
     added = model._added_stability
+
+    cut_candidates: List[Tuple[float, int, int, int, int, int, List[Tuple[int, int]]]] = []
 
     # Mirror diagnostics.check_aggregate_stability:
     # a blocking pair (w,i,j,k,t) exists iff:
@@ -74,19 +75,97 @@ def _stability_lazy_cb(model: gp.Model, where: int) -> None:
                         key = (w, i, j, k, t)
                         if key in added:
                             continue
-                        added.add(key)
+                        cut_candidates.append((cap - lhs_blocking_val, w, i, j, k, t, better))
 
-                        model.cbLazy(
-                            u[w, i, t]
-                            >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
-                        )
+    if not cut_candidates:
+        return 0
 
-                        lhs_blocking_expr = gp.LinExpr()
-                        for w2, i2 in better:
-                            lhs_blocking_expr += y[w2, i2, j, k, t]
-                        model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+    cut_candidates.sort(key=lambda item: item[0], reverse=True)
+    added_now = 0
+    for _, w, i, j, k, t, better in cut_candidates:
+        if added_now >= model._max_stability_cuts_per_cb:
+            break
+        key = (w, i, j, k, t)
+        if key in added:
+            continue
+        added.add(key)
 
-                        return
+        model.cbLazy(
+            u[w, i, t]
+            >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
+        )
+
+        lhs_blocking_expr = gp.LinExpr()
+        for w2, i2 in better:
+            lhs_blocking_expr += y[w2, i2, j, k, t]
+        model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+        added_now += 1
+
+    model._n_added_stability += added_now
+    return added_now
+
+
+def _separate_physical_cuts(model: gp.Model) -> int:
+    eps = 1e-6
+    Nodes = model._Nodes
+    Time = model._Time
+    A = model._A
+    U = model._U
+    F_bar = model._F_bar
+    Y_i = model._Y_i
+    m_hat = model._m_hat
+    added = model._added_physical
+
+    # Violation records: (violation, kind, source, dest, t)
+    candidates: List[Tuple[float, str, int, int, int]] = []
+    for t in Time:
+        for j in Nodes:
+            swap_cap = float(model.cbGetSolution(U[j, t])) + float(model.cbGetSolution(F_bar[j, t]))
+            swap_used = float(model.cbGetSolution(m_hat[j, j, t]))
+            if swap_used > swap_cap + eps and ("swap", j, j, t) not in added:
+                candidates.append((swap_used - swap_cap, "swap", j, j, t))
+
+            reb_cap = float(model.cbGetSolution(A[j, t])) - float(model.cbGetSolution(Y_i[j, t]))
+            for k in Nodes:
+                if j == k:
+                    continue
+                used = float(model.cbGetSolution(m_hat[j, k, t]))
+                if used > reb_cap + eps and ("rebalance", j, k, t) not in added:
+                    candidates.append((used - reb_cap, "rebalance", j, k, t))
+
+    if not candidates:
+        return 0
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    added_now = 0
+    for _, kind, j, k, t in candidates:
+        if added_now >= model._max_physical_cuts_per_cb:
+            break
+        key = (kind, j, k, t)
+        if key in added:
+            continue
+        added.add(key)
+        if kind == "swap":
+            model.cbLazy(m_hat[j, j, t] <= U[j, t] + F_bar[j, t])
+        else:
+            model.cbLazy(m_hat[j, k, t] <= A[j, t] - Y_i[j, t])
+        added_now += 1
+
+    model._n_added_physical += added_now
+    return added_now
+
+
+def _nested_lazy_cb(model: gp.Model, where: int) -> None:
+    if where != GRB.Callback.MIPSOL:
+        return
+
+    if model._enforce_stability:
+        n_stability = _separate_stability_cuts(model)
+        if n_stability > 0:
+            return
+
+    if model._enforce_physical:
+        _separate_physical_cuts(model)
 
 
 def build_and_solve(
@@ -218,15 +297,9 @@ def build_and_solve(
             m.addConstr(F[j, t] == expr_F)
             m.addConstr(F_bar[j, t] == expr_F_bar)
 
-        # 3. Task Generation Limits (m_hat)
-        for j in Nodes:
-            # Swap tasks (jj) constrained by U + F_bar
-            m.addConstr(m_hat[j, j, t] <= U[j, t] + F_bar[j, t])
-            # Rebalance tasks (ij, i!=j) constrained by A - Y
-            for i in Nodes:
-                if i != j:
-                    m.addConstr(
-                        m_hat[j, i, t] <= A[j, t] - Y_i[j, t])  # Note: Latex says m_hat_{ij} <= A_j - Y_j. Source is j.
+        # 3. Task generation upper-bounds are separated lazily in the callback.
+        # This keeps the base MP lighter and lets physical feasibility be checked
+        # only on integer incumbents (nested logic -> physical verification).
 
         # 4. State Transitions (A and U) - NEXT TIME STEP
         if t < T_max - 1:
@@ -370,6 +443,11 @@ def build_and_solve(
     m._Q = Q
     m._Mu = Mu
     m._M_pool_ub = M_pool_ub
+    m._A = A
+    m._U = U
+    m._F_bar = F_bar
+    m._Y_i = Y_i
+    m._m_hat = m_hat
     m._y = y
     m._l = l
     m._u = u
@@ -377,13 +455,20 @@ def build_and_solve(
     m._p = p
     m._M_pool = M_pool
     m._better_pairs = better_pairs
+    m._enforce_stability = bool(check_stability)
+    m._enforce_physical = True
+    m._max_stability_cuts_per_cb = 5
+    m._max_physical_cuts_per_cb = 20
     m._added_stability = set()
+    m._added_physical = set()
+    m._n_added_stability = 0
+    m._n_added_physical = 0
 
     # ==========================================
     # Solve
     # ==========================================
     start_time = time.time()
-    m.optimize(_stability_lazy_cb)
+    m.optimize(_nested_lazy_cb)
     end_time = time.time()
 
     res = SolveResult(
@@ -393,6 +478,8 @@ def build_and_solve(
         mip_gap=float(getattr(m, "MIPGap", 0.0)) if m.SolCount > 0 and m.IsMIP else None,
         n_vars=int(m.NumVars),
         n_constrs=int(m.NumConstrs),
+        n_lazy_stability_cuts=int(m._n_added_stability),
+        n_lazy_physical_cuts=int(m._n_added_physical),
     )
 
     if run_diagnostics and m.SolCount > 0:
@@ -447,7 +534,8 @@ def main() -> None:
     )
     print(
         f"seed={run_seed} status={res.status} runtime={res.runtime_sec:.2f}s obj={res.obj_val} gap={res.mip_gap} "
-        f"vars={res.n_vars} constrs={res.n_constrs}"
+        f"vars={res.n_vars} constrs={res.n_constrs} "
+        f"stab_cuts={res.n_lazy_stability_cuts} phys_cuts={res.n_lazy_physical_cuts}"
     )
     if res.diag_basic_summary:
         print(res.diag_basic_summary)
