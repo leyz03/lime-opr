@@ -1,0 +1,53 @@
+{
+  "config_type": "linear_distance",
+  "config": {
+    "n_nodes": 12,
+    "T": 6,
+    "total_bikes": 160,
+    "total_workers": 12,
+    "demand_level": 0.6,
+    "base_demand_by_node": [
+      5.254411722146599,
+      5.023699401231566,
+      3.8235283639620774,
+      7.247472471839449,
+      9.333843562825564,
+      9.488296183306009,
+      9.723597412121858,
+      10.84896766762508,
+      2.214904388546939,
+      4.709863336119439,
+      8.134438504501123,
+      12.196976985774302
+    ],
+    "time_multipliers": [
+      1.0822559402466867,
+      1.078466168896072,
+      1.0816135603693395,
+      0.9472978532490339,
+      0.5820014579938271,
+      0.8164432923248383
+    ],
+    "od_dirichlet_alpha": 0.35,
+    "coords": null,
+    "coord_scale": 17.0,
+    "d_base": 1.0,
+    "d_slope": 0.12,
+    "c_base": 1.0,
+    "c_slope": 0.15,
+    "c_diag_constant": 1.0,
+    "phi_base": 0.03,
+    "phi_slope": 0.02,
+    "phi_min": 0.01,
+    "phi_max": 0.45,
+    "phi_override": null,
+    "revenue_level": 8.0,
+    "penalty_Cp": 3.0,
+    "price_ub": 12.0,
+    "bigM_Q": 10000.0,
+    "price_lb_for_test": null,
+    "initial_backlog_level": 1,
+    "enforce_integer_lags": true
+  },
+  "seed": 202611
+}
