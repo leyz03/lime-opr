@@ -35,7 +35,6 @@ def build_and_solve(
     # 1. Data Generation (模拟数据)
     # ==========================================
     Nodes = scenario["Nodes"]
-    Workers = scenario["Workers"]
     Time = scenario["Time"]
     T_max = scenario["T_max"]
 
@@ -51,7 +50,6 @@ def build_and_solve(
     U_init = scenario["U_init"]
     M_init = scenario["M_init"]
     W_init = scenario["W_init"]
-    l_init = scenario["l_init"]
     price_ub = scenario["price_ub"]
 
     # ==========================================
@@ -86,12 +84,11 @@ def build_and_solve(
     x = m.addVars(Nodes, Nodes, Nodes, Time, lb=0, vtype=GRB.INTEGER, name="x")  # Aggregated flow
     W_count = m.addVars(Nodes, Time, lb=0, name="W_count")
 
-    y = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y")  # Specific assignment
-    l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")  # Availability
-    # NOTE: utility can be negative (e.g., low price/high travel time). If you keep lb=0
-    # you silently rule out negative-profit assignments.
-    u = m.addVars(Workers, Nodes, Time, lb=0, name="u")
-    delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
+    # Aggregate Stable Matching Variables
+    y_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y_agg")  # Indicator if flow x > 0
+    s = m.addVars(Nodes, Time, lb=0, name="s")  # Shadow price / Opportunity cost
+    delta_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta_agg")  # Indicator if job jk is full for i
+    z = m.addVars(Nodes, Time, vtype=GRB.BINARY, name="z")  # Indicator if workers at node i are fully dispatched
 
     # Pricing & Control
     p = m.addVars(Nodes, Nodes, lb=0, ub=price_ub, name="p")  # p_ij (Static as per Latex notation, or implied static)
@@ -104,10 +101,6 @@ def build_and_solve(
         m.addConstr(W_count[i, 0] == W_init[i])  # 简化初始化
         for j in Nodes:
             m.addConstr(M_pool[i, j, 0] == M_init[i, j])
-
-    for w in Workers:
-        for i in Nodes:
-            m.addConstr(l[w, i, 0] == l_init[w, i])
 
     # --- Constraints Loop ---
     for t in Time:
@@ -129,7 +122,7 @@ def build_and_solve(
             # Flow Split
             for j in Nodes:
                 if D_i[i, t] > 0:
-                    m.addConstr(Y_ij[i, j, t] == Y_i[i, t] * (D_pair[i, j, t] / D_i[i, t]))
+                    m.addConstr(Y_ij[i, j, t] == Y_i[i, t] * (D_pair[i, j, t] / D_i[i, t])) #bilinear
                 else:
                     m.addConstr(Y_ij[i, j, t] == 0)
 
@@ -226,58 +219,31 @@ def build_and_solve(
                 # m_tilde <= M
                 m.addConstr(m_tilde[j, k, t] <= M_pool[j, k, t])
 
-        # 8. Micro Matching (y, l, u, Stability)
-        for w in Workers:
-            # Capacity
-            m.addConstr(gp.quicksum(y[w, i, j, k, t] for i in Nodes for j in Nodes for k in Nodes) <= 1)
-
-            # Location constraint
-            for i in Nodes:
-                m.addConstr(gp.quicksum(y[w, i, j, k, t] for j in Nodes for k in Nodes) <= l[w, i, t])
-
-            # l update
-            if t < T_max - 1:
-                for i in Nodes:
-                    leaving_l = gp.quicksum(y[w, i, j, k, t] for j in Nodes for k in Nodes)
-                    arriving_l = 0
-                    for g in Nodes:
-                        for h in Nodes:
-                            # Worker comes from g -> h -> i
-                            # If you want to follow the LaTeX literally (t-1-d-c), keep lag_offset=1.
-                            # If you want to align with x-dynamics (t-d-c), set lag_offset=0.
-                            lag_offset = 1
-                            t_l = t - d[g, h] - c[h, i] - lag_offset
-                            if t_l >= 0:
-                                arriving_l += y[w, g, h, i, t_l]
-                    m.addConstr(l[w, i, t + 1] == l[w, i, t] - leaving_l + arriving_l)
-
-            # Utility
-            for i in Nodes:
-                val = gp.quicksum(y[w, i, j, k, t] * (p[j, k] - d[i, j] - c[j, k]) for j in Nodes for k in Nodes)
-                m.addConstr(u[w, i, t] == val)
-
-                # Stability
-                for j in Nodes:
-                    for k in Nodes:
-                        rhs = (p[j, k] - d[i, j] - c[j, k]) * l[w, i, t] - delta[w, i, j, k, t] * Q
-                        m.addConstr(u[w, i, t] >= rhs)
-
-                        # Blocking Pair Condition:
-                        # sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t] >= delta[w,i,j,k,t] * M_pool[j,k,t]
-                        lhs_blocking = 0
-                        for w_prime in Workers:
-                            for i_prime in Nodes:
-                                if (d[i_prime, j] < d[i, j]) or (
-                                    d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
-                                ):
-                                    lhs_blocking += y[w_prime, i_prime, j, k, t]
-                        m.addConstr(lhs_blocking >= delta[w, i, j, k, t] * M_pool[j, k, t])
-
-        # x = sum y
+        # 8. Aggregate Stable Matching Constraints (Eq 31-36)
         for i in Nodes:
+            # Constraint (35): if z[i,t] == 0, W_i^t must be fully dispatched
+            sum_x_i = gp.quicksum(x[i, j_prime, k_prime, t] for j_prime in Nodes for k_prime in Nodes)
+            m.addConstr(sum_x_i >= W_count[i, t] - Q * (1 - z[i, t]), name=f"z_indicator_{i}_{t}")
+
             for j in Nodes:
                 for k in Nodes:
-                    m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
+                    profit_ijk = p[j, k] - d[i, j] - c[j, k]
+
+                    # Constraint (31): Blocking pair condition / Job saturation
+                    lhs_31 = gp.quicksum(x[i_prime, j, k, t] for i_prime in Nodes if d[i_prime, j] <= d[i, j])
+                    m.addConstr(lhs_31 >= delta_agg[i, j, k, t] * M_pool[j, k, t], name=f"sat_delta_{i}_{j}_{k}_{t}")
+
+                    # Constraint (32): x and y_agg linkage
+                    m.addConstr(x[i, j, k, t] <= Q * y_agg[i, j, k, t], name=f"x_y_link_{i}_{j}_{k}_{t}")
+
+                    # Constraint (33): Opportunity cost lower bound if assigned
+                    m.addConstr(profit_ijk >= s[i, t] - Q * (1 - y_agg[i, j, k, t]), name=f"s_lb_{i}_{j}_{k}_{t}")
+
+                    # Constraint (34): Opportunity cost upper bound / alternative formulation
+                    m.addConstr(s[i, t] >= profit_ijk - delta_agg[i, j, k, t] * Q, name=f"s_ub_{i}_{j}_{k}_{t}")
+
+                    # Constraint (36): Profit bound if workers are not fully dispatched
+                    m.addConstr(profit_ijk <= Q * z[i, t], name=f"profit_z_link_{i}_{j}_{k}_{t}")
 
     # --- Objective ---
     obj = 0
@@ -325,9 +291,10 @@ def build_and_solve(
             "x": x,
             "W_count": W_count,
             "p": p,
-            "y": y,
-            "l": l,
-            "u": u,
+            "y_agg": y_agg,
+            "s": s,
+            "delta_agg": delta_agg,
+            "z": z,
         }
 
         rep_basic = check_basic_invariants(scenario, varpack, tol=1e-6, check_bilinear_min=check_min_mech)
@@ -335,9 +302,13 @@ def build_and_solve(
         res.diag_basic_summary = rep_basic.summarize(max_items=30)
 
         if check_stability:
-            rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=False)
-            res.diag_stability_ok = bool(rep_stab.ok)
-            res.diag_stability_summary = rep_stab.summarize(max_items=30)
+            try:
+                rep_stab = check_aggregate_stability(scenario, varpack, tol=1e-6, only_positive_profit=False)
+                res.diag_stability_ok = bool(rep_stab.ok)
+                res.diag_stability_summary = rep_stab.summarize(max_items=30)
+            except KeyError as e:
+                res.diag_stability_ok = False
+                res.diag_stability_summary = f"Stability diagnostics skipped (incompatible varpack): missing {e}"
 
     return res
 

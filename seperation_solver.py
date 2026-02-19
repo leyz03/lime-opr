@@ -21,72 +21,82 @@ class SolveResult:
     diag_stability_summary: Optional[str] = None
 
 
-def _stability_lazy_cb(model: gp.Model, where: int) -> None:
+def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
     if where != GRB.Callback.MIPSOL:
         return
 
-    eps = 1e-6
+    eps = 1e-5
     Nodes = model._Nodes
-    Workers = model._Workers
     Time = model._Time
     d = model._d
     c = model._c
 
-    y = model._y
-    l = model._l
-    u = model._u
-    delta = model._delta
+    x = model._x
+    W_count = model._W_count
     p = model._p
     M_pool = model._M_pool
+    s = model._s
+    delta_agg = model._delta_agg
 
     Mu = model._Mu
     M_pool_ub = model._M_pool_ub
-    better_pairs = model._better_pairs
+    better_nodes = model._better_nodes
     added = model._added_stability
 
-    # Mirror diagnostics.check_aggregate_stability:
-    # a blocking pair (w,i,j,k,t) exists iff:
-    #   1) l[w,i,t] == 1
-    #   2) v_alt = p[j,k] - d[i,j] - c[j,k] > u[w,i,t]
-    #   3) sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t] < M_pool[j,k,t]
     for t in Time:
-        for w in Workers:
-            for i in Nodes:
-                if float(model.cbGetSolution(l[w, i, t])) <= 0.5:
-                    continue
+        for i in Nodes:
+            w_val = float(model.cbGetSolution(W_count[i, t]))
+            if w_val <= eps:
+                continue
 
-                u_cur = float(model.cbGetSolution(u[w, i, t]))
-                for j in Nodes:
-                    better = better_pairs[(w, i, j)]
-                    for k in Nodes:
-                        cap = float(model.cbGetSolution(M_pool[j, k, t]))
-                        v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
-                        if v_alt <= u_cur + eps:
-                            continue
+            # Current minimal acceptable profit among workers at node i.
+            disp_val = 0.0
+            u_cur = float("inf")
+            for j in Nodes:
+                for k in Nodes:
+                    x_val = float(model.cbGetSolution(x[i, j, k, t]))
+                    disp_val += x_val
+                    if x_val >= 0.5:
+                        prof = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
+                        if prof < u_cur:
+                            u_cur = prof
 
-                        lhs_blocking_val = 0.0
-                        for w2, i2 in better:
-                            lhs_blocking_val += float(model.cbGetSolution(y[w2, i2, j, k, t]))
+            idle_val = w_val - disp_val
+            if idle_val >= 0.5:
+                u_cur = min(u_cur, 0.0)
+            if u_cur == float("inf"):
+                u_cur = 0.0
 
-                        if lhs_blocking_val >= cap - eps:
-                            continue
+            for j in Nodes:
+                for k in Nodes:
+                    v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
+                    if v_alt <= u_cur + eps:
+                        continue
 
-                        key = (w, i, j, k, t)
-                        if key in added:
-                            continue
-                        added.add(key)
+                    cap = float(model.cbGetSolution(M_pool[j, k, t]))
+                    lhs_sat_val = 0.0
+                    for ip in better_nodes[(i, j)]:
+                        lhs_sat_val += float(model.cbGetSolution(x[ip, j, k, t]))
+                    if lhs_sat_val >= cap - eps:
+                        continue
 
-                        model.cbLazy(
-                            u[w, i, t]
-                            >= p[j, k] - d[i, j] - c[j, k] - model._Q * delta[w, i, j, k, t] - Mu * (1 - l[w, i, t])
-                        )
+                    key = (i, j, k, t)
+                    if key in added:
+                        continue
+                    added.add(key)
 
-                        lhs_blocking_expr = gp.LinExpr()
-                        for w2, i2 in better:
-                            lhs_blocking_expr += y[w2, i2, j, k, t]
-                        model.cbLazy(lhs_blocking_expr + M_pool_ub * (1 - delta[w, i, j, k, t]) >= M_pool[j, k, t])
+                    delta_var = delta_agg[i, j, k, t]
 
-                        return
+                    # If not saturated (delta=0), enforce opportunity cost >= alternative profit.
+                    model.cbLazy(s[i, t] >= p[j, k] - float(d[i, j]) - float(c[j, k]) - Mu * delta_var)
+
+                    # delta=1 implies task saturation by better-or-equal nodes.
+                    lhs_sat_expr = gp.LinExpr()
+                    for ip in better_nodes[(i, j)]:
+                        lhs_sat_expr += x[ip, j, k, t]
+                    model.cbLazy(lhs_sat_expr + M_pool_ub * (1 - delta_var) >= M_pool[j, k, t])
+
+                    return
 
 
 def build_and_solve(
@@ -103,7 +113,6 @@ def build_and_solve(
     # 1. Data Generation (模拟数据)
     # ==========================================
     Nodes = scenario["Nodes"]
-    Workers = scenario["Workers"]
     Time = scenario["Time"]
     T_max = scenario["T_max"]
 
@@ -119,12 +128,12 @@ def build_and_solve(
     U_init = scenario["U_init"]
     M_init = scenario["M_init"]
     W_init = scenario["W_init"]
-    l_init = scenario["l_init"]
     price_ub = scenario["price_ub"]
     max_d = max(float(d[i, j]) for i in Nodes for j in Nodes)
     max_c = max(float(c[i, j]) for i in Nodes for j in Nodes)
     Mu = float(price_ub) + max_d + max_c
     M_pool_ub = float(sum(A_init[i] + U_init[i] for i in Nodes))
+    W_ub = float(sum(W_init[i] for i in Nodes))
 
     # ==========================================
     # Model Formulation
@@ -156,14 +165,15 @@ def build_and_solve(
     m_tilde = m.addVars(Nodes, Nodes, Time, lb=0, name="m_tilde")  # Tasks Matched
     M_pool = m.addVars(Nodes, Nodes, Time, lb=0, name="M_pool")  # Task Backlog (M)
 
-    # Micro Worker Variables
+    # Aggregate Worker Flow Variables
     x = m.addVars(Nodes, Nodes, Nodes, Time, lb=0, vtype=GRB.INTEGER, name="x")  # Aggregated flow
     W_count = m.addVars(Nodes, Time, lb=0, name="W_count")
 
-    y = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y")  # Specific assignment
-    l = m.addVars(Workers, Nodes, Time, vtype=GRB.BINARY, name="l")  # Availability
-    u = m.addVars(Workers, Nodes, Time, lb=0, name="u")
-    delta = m.addVars(Workers, Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta")
+    # Macro Stability Variables (for callback separation)
+    y_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y_agg")
+    s = m.addVars(Nodes, Time, lb=-GRB.INFINITY, name="s")
+    z = m.addVars(Nodes, Time, vtype=GRB.BINARY, name="z")
+    delta_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta_agg")
 
     # Pricing & Control
     p = m.addVars(Nodes, Nodes, lb=0, ub=price_ub, name="p")  # p_ij (Static as per Latex notation, or implied static)
@@ -176,10 +186,6 @@ def build_and_solve(
         m.addConstr(W_count[i, 0] == W_init[i])  # 简化初始化
         for j in Nodes:
             m.addConstr(M_pool[i, j, 0] == M_init[i, j])
-
-    for w in Workers:
-        for i in Nodes:
-            m.addConstr(l[w, i, 0] == l_init[w, i])
 
     # --- Constraints Loop ---
     for t in Time:
@@ -298,41 +304,15 @@ def build_and_solve(
                 # m_tilde <= M
                 m.addConstr(m_tilde[j, k, t] <= M_pool[j, k, t])
 
-        # 8. Micro Matching (y, l, u, Stability)
-        for w in Workers:
-            # Capacity
-            m.addConstr(gp.quicksum(y[w, i, j, k, t] for i in Nodes for j in Nodes for k in Nodes) <= 1)
-
-            # Location constraint
-            for i in Nodes:
-                m.addConstr(gp.quicksum(y[w, i, j, k, t] for j in Nodes for k in Nodes) <= l[w, i, t])
-
-            # l update
-            if t < T_max - 1:
-                for i in Nodes:
-                    leaving_l = gp.quicksum(y[w, i, j, k, t] for j in Nodes for k in Nodes)
-                    arriving_l = 0
-                    for g in Nodes:
-                        for h in Nodes:
-                            # Worker comes from g -> h -> i
-                            # If you want to follow the LaTeX literally (t-1-d-c), keep lag_offset=1.
-                            # If you want to align with x-dynamics (t-d-c), set lag_offset=0.
-                            lag_offset = 1
-                            t_l = t - d[g, h] - c[h, i] - lag_offset
-                            if t_l >= 0:
-                                arriving_l += y[w, g, h, i, t_l]
-                    m.addConstr(l[w, i, t + 1] == l[w, i, t] - leaving_l + arriving_l)
-
-            # Utility
-            for i in Nodes:
-                val = gp.quicksum(y[w, i, j, k, t] * (p[j, k] - d[i, j] - c[j, k]) for j in Nodes for k in Nodes)
-                m.addConstr(u[w, i, t] == val)
-
-        # x = sum y
+        # 8. Structural Constraints for Separation
         for i in Nodes:
+            dispatch_expr = gp.quicksum(x[i, j, k, t] for j in Nodes for k in Nodes)
+            m.addConstr(dispatch_expr >= W_count[i, t] - W_ub * (1 - z[i, t]))
+            m.addConstr(s[i, t] <= Mu * z[i, t])
             for j in Nodes:
                 for k in Nodes:
-                    m.addConstr(x[i, j, k, t] == gp.quicksum(y[w, i, j, k, t] for w in Workers))
+                    m.addConstr(x[i, j, k, t] <= W_ub * y_agg[i, j, k, t])
+                    m.addConstr(s[i, t] <= (p[j, k] - d[i, j] - c[j, k]) + Mu * (1 - y_agg[i, j, k, t]))
 
     # --- Objective ---
     obj = 0
@@ -349,41 +329,32 @@ def build_and_solve(
 
     m.setObjective(obj, GRB.MAXIMIZE)
 
-    better_pairs = {}
-    for w in Workers:
-        for i in Nodes:
-            for j in Nodes:
-                pairs = []
-                for w_prime in Workers:
-                    for i_prime in Nodes:
-                        if (d[i_prime, j] < d[i, j]) or (
-                            d[i_prime, j] == d[i, j] and i_prime == i and w_prime < w
-                        ):
-                            pairs.append((w_prime, i_prime))
-                better_pairs[(w, i, j)] = pairs
+    better_nodes = {}
+    for i in Nodes:
+        for j in Nodes:
+            better_nodes[(i, j)] = [ip for ip in Nodes if d[ip, j] <= d[i, j]]
 
     m._Nodes = Nodes
-    m._Workers = Workers
     m._Time = Time
     m._d = d
     m._c = c
     m._Q = Q
     m._Mu = Mu
     m._M_pool_ub = M_pool_ub
-    m._y = y
-    m._l = l
-    m._u = u
-    m._delta = delta
+    m._x = x
+    m._W_count = W_count
     m._p = p
     m._M_pool = M_pool
-    m._better_pairs = better_pairs
+    m._s = s
+    m._delta_agg = delta_agg
+    m._better_nodes = better_nodes
     m._added_stability = set()
 
     # ==========================================
     # Solve
     # ==========================================
     start_time = time.time()
-    m.optimize(_stability_lazy_cb)
+    m.optimize(_aggregate_stability_lazy_cb)
     end_time = time.time()
 
     res = SolveResult(
@@ -410,9 +381,10 @@ def build_and_solve(
             "x": x,
             "W_count": W_count,
             "p": p,
-            "y": y,
-            "l": l,
-            "u": u,
+            "y_agg": y_agg,
+            "s": s,
+            "delta_agg": delta_agg,
+            "z": z,
         }
         rep_basic = check_basic_invariants(scenario, varpack, tol=1e-6, check_bilinear_min=check_min_mech)
         res.diag_basic_ok = bool(rep_basic.ok)

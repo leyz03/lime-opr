@@ -196,25 +196,13 @@ def check_basic_invariants(
     return DiagReport(ok=ok, issues=issues)
 
 
-def check_aggregate_stability(
+def _check_aggregate_stability_micro(
     scenario: Dict[str, Any],
     vars: Dict[str, Any],
     tol: float = 1e-6,
     only_positive_profit: bool = False,
 ) -> DiagReport:
-    """Stability checker using the exact blocking-pair logic on (w, i, j, k, t).
-
-    Required vars in `vars`:
-      - y[w,i,j,k,t], l[w,i,t], u[w,i,t], p[j,k], M_pool[j,k,t]
-
-    For each worker-location-time (w,i,t) and candidate task (j,k):
-      1) cap = M_pool[j,k,t]
-      2) v_alt = p[j,k] - d[i,j] - c[j,k]
-      3) skip if v_alt <= u_cur + tol (worker does not strictly prefer deviating)
-      4) lhs = sum_{(w',i') in Better(w,i,j)} y[w',i',j,k,t]
-      5) skip if lhs >= cap - tol (task fully occupied by better workers)
-      6) otherwise (w,i,j,k,t) is a blocking pair.
-    """
+    """Legacy micro stability checker on (w, i, j, k, t)."""
     Nodes: List[int] = scenario["Nodes"]
     Workers: List[int] = scenario["Workers"]
     Time: List[int] = scenario["Time"]
@@ -243,10 +231,8 @@ def check_aggregate_stability(
     for t in Time:
         for w in Workers:
             for i in Nodes:
-                # Skip if worker w at location i cannot work
                 if _val(l[w, i, t]) <= 0.5:
                     continue
-                # current utility for worker w at location i and time t
                 u_cur = _val(u[w, i, t])
                 for j in Nodes:
                     for k in Nodes:
@@ -267,15 +253,121 @@ def check_aggregate_stability(
                         issues.append(
                             DiagIssue(
                                 "stability",
-                                "Blocking pair found (strict preference + insufficient better-worker occupancy)",
+                                "Blocking pair found (micro: strict preference + insufficient better-worker occupancy)",
                                 (w, i, j, k, t),
                                 lhs=lhs_blocking_val,
                                 rhs=cap,
                             )
                         )
 
-    ok = len(issues) == 0
-    return DiagReport(ok=ok, issues=issues)
+    return DiagReport(ok=(len(issues) == 0), issues=issues)
+
+
+def _check_aggregate_stability_flow(
+    scenario: Dict[str, Any],
+    vars: Dict[str, Any],
+    tol: float = 1e-6,
+    only_positive_profit: bool = False,
+) -> DiagReport:
+    """Aggregate-flow stability checker on (i, j, k, t)."""
+    Nodes: List[int] = scenario["Nodes"]
+    Time: List[int] = scenario["Time"]
+    d = scenario["d"]
+    c = scenario["c"]
+
+    x = vars["x"]
+    W_count = vars["W_count"]
+    p = vars["p"]
+    M_pool = vars["M_pool"]
+
+    issues: List[DiagIssue] = []
+
+    better_nodes: Dict[Tuple[int, int], List[int]] = {}
+    for i in Nodes:
+        for j in Nodes:
+            better_nodes[(i, j)] = [ip for ip in Nodes if d[ip, j] <= d[i, j]]
+
+    for t in Time:
+        for i in Nodes:
+            w_val = _val(W_count[i, t])
+            if w_val <= tol:
+                continue
+
+            disp_val = 0.0
+            u_cur = float("inf")
+            for j in Nodes:
+                for k in Nodes:
+                    x_val = _val(x[i, j, k, t])
+                    disp_val += x_val
+                    if x_val > tol:
+                        prof = _val(p[j, k]) - float(d[i, j]) - float(c[j, k])
+                        if prof < u_cur:
+                            u_cur = prof
+
+            idle_val = w_val - disp_val
+            if idle_val > tol:
+                u_cur = min(u_cur, 0.0)
+            if u_cur == float("inf"):
+                u_cur = 0.0
+
+            for j in Nodes:
+                for k in Nodes:
+                    v_alt = _val(p[j, k]) - float(d[i, j]) - float(c[j, k])
+                    if v_alt <= u_cur + tol:
+                        continue
+                    if only_positive_profit and v_alt <= tol:
+                        continue
+
+                    cap = _val(M_pool[j, k, t])
+                    lhs_sat_val = 0.0
+                    for ip in better_nodes[(i, j)]:
+                        lhs_sat_val += _val(x[ip, j, k, t])
+
+                    if lhs_sat_val >= cap - tol:
+                        continue
+
+                    issues.append(
+                        DiagIssue(
+                            "stability",
+                            "Blocking pair found (aggregate flow: strict preference + unsaturated task)",
+                            (i, j, k, t),
+                            lhs=lhs_sat_val,
+                            rhs=cap,
+                        )
+                    )
+
+    return DiagReport(ok=(len(issues) == 0), issues=issues)
+
+
+def check_aggregate_stability(
+    scenario: Dict[str, Any],
+    vars: Dict[str, Any],
+    tol: float = 1e-6,
+    only_positive_profit: bool = False,
+) -> DiagReport:
+    """Stability checker supporting both micro and aggregate-flow models.
+
+    Dispatch rule:
+      - If `y/l/u` are provided, run micro checker.
+      - Else if `x/W_count` are provided, run aggregate-flow checker.
+    """
+    has_micro = all(k in vars for k in ("y", "l", "u", "p", "M_pool"))
+    has_flow = all(k in vars for k in ("x", "W_count", "p", "M_pool"))
+
+    if has_micro:
+        return _check_aggregate_stability_micro(scenario, vars, tol=tol, only_positive_profit=only_positive_profit)
+    if has_flow:
+        return _check_aggregate_stability_flow(scenario, vars, tol=tol, only_positive_profit=only_positive_profit)
+
+    return DiagReport(
+        ok=False,
+        issues=[
+            DiagIssue(
+                "stability",
+                "Unsupported varpack for stability diagnostics: expected either (y,l,u,p,M_pool) or (x,W_count,p,M_pool).",
+            )
+        ],
+    )
 
 if __name__ == "__main__":
     print("This module provides diagnostics functions for the bike-opt model. Import and call check_basic_invariants() and check_aggregate_stability() after solving the model to validate the solution.")
