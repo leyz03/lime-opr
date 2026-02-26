@@ -42,7 +42,6 @@ def build_and_solve(
     c = scenario["c"]
     R = scenario["R"]
     C_p = scenario["C_p"]
-    Q = scenario["Q"]
     phi = scenario["phi"]
     D_i = scenario["D_i"]
     D_pair = scenario["D_pair"]
@@ -51,12 +50,23 @@ def build_and_solve(
     M_init = scenario["M_init"]
     W_init = scenario["W_init"]
     price_ub = scenario["price_ub"]
+    # Big-M constants:
+    # Q1: worker upper bound, Q2: utility/profit gap bound, Q3: bike/task upper bound.
+    total_workers = float(sum(W_init[i] for i in Nodes))
+    total_bikes = float(sum(A_init[i] + U_init[i] for i in Nodes))
+    max_demand = max(float(D_i[i, t]) for i in Nodes for t in Time)
+    max_init_pool = max(float(M_init[i, j]) for i in Nodes for j in Nodes)
+    Q1 = total_workers
+    min_d = min(float(d[i, j]) for i in Nodes for j in Nodes)
+    min_c = min(float(c[i, j]) for i in Nodes for j in Nodes)
+    Q2 = float(price_ub) - min_d - min_c
+    Q3 = max(total_bikes, max_demand, max_init_pool)
 
     # ==========================================
     # Model Formulation
     # ==========================================
     m = gp.Model("Latex_Strict_Implementation")
-    m.Params.NonConvex = 2  # 允许非凸二次约束 (alpha * A, p * m)
+    m.Params.NonConvex = 2  # 允许非凸二次目标 (p * m)
     m.Params.OutputFlag = int(output_flag)
     m.Params.Seed = 1
     if time_limit is not None:
@@ -88,11 +98,12 @@ def build_and_solve(
     y_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="y_agg")  # Indicator if flow x > 0
     s = m.addVars(Nodes, Time, lb=0, name="s")  # Shadow price / Opportunity cost
     delta_agg = m.addVars(Nodes, Nodes, Nodes, Time, vtype=GRB.BINARY, name="delta_agg")  # Indicator if job jk is full for i
+    v_delta_M = m.addVars(Nodes, Nodes, Nodes, Time, lb=0, name="v_delta_M")  # v = delta_agg * M_pool linearization
     z = m.addVars(Nodes, Time, vtype=GRB.BINARY, name="z")  # Indicator if workers at node i are fully dispatched
 
     # Pricing & Control
     p = m.addVars(Nodes, Nodes, lb=0, ub=price_ub, name="p")  # p_ij (Static as per Latex notation, or implied static)
-    alpha = m.addVars(Nodes, Time, lb=0, ub=1, name="alpha")
+    beta = m.addVars(Nodes, Time, vtype=GRB.BINARY, name="beta")
 
     # --- Initialization (t=0) ---
     for i in Nodes:
@@ -109,12 +120,9 @@ def build_and_solve(
         for i in Nodes:
             m.addConstr(Y_i[i, t] <= A[i, t], name=f"Y_le_A_{i}_{t}")
             m.addConstr(Y_i[i, t] <= D_i[i, t], name=f"Y_le_D_{i}_{t}")
-            # Min mechanism: Y >= alpha*A + (1-alpha)*D
-            # With Y<=A and Y<=D and positive revenue/penalty, Y should end up at min(A,D).
-            m.addConstr(
-                Y_i[i, t] >= alpha[i, t] * A[i, t] + (1 - alpha[i, t]) * D_i[i, t],
-                name=f"Y_min_mech_{i}_{t}",
-            )
+            # Min mechanism linearization: Y_i = min(A_i, D_i) with Big-M.
+            m.addConstr(Y_i[i, t] >= A[i, t] - Q3 * (1 - beta[i, t]), name=f"Y_min_A_lb_{i}_{t}")
+            m.addConstr(Y_i[i, t] >= D_i[i, t] - Q3 * beta[i, t], name=f"Y_min_D_lb_{i}_{t}")
 
             # Lost Demand
             m.addConstr(L_i[i, t] == D_i[i, t] - Y_i[i, t])
@@ -223,7 +231,7 @@ def build_and_solve(
         for i in Nodes:
             # Constraint (35): if z[i,t] == 0, W_i^t must be fully dispatched
             sum_x_i = gp.quicksum(x[i, j_prime, k_prime, t] for j_prime in Nodes for k_prime in Nodes)
-            m.addConstr(sum_x_i >= W_count[i, t] - Q * (1 - z[i, t]), name=f"z_indicator_{i}_{t}")
+            m.addConstr(sum_x_i >= W_count[i, t] - Q1 * (1 - z[i, t]), name=f"z_indicator_{i}_{t}")
 
             for j in Nodes:
                 for k in Nodes:
@@ -231,19 +239,26 @@ def build_and_solve(
 
                     # Constraint (31): Blocking pair condition / Job saturation
                     lhs_31 = gp.quicksum(x[i_prime, j, k, t] for i_prime in Nodes if d[i_prime, j] <= d[i, j])
-                    m.addConstr(lhs_31 >= delta_agg[i, j, k, t] * M_pool[j, k, t], name=f"sat_delta_{i}_{j}_{k}_{t}")
+                    m.addConstr(v_delta_M[i, j, k, t] <= M_pool[j, k, t], name=f"v_le_M_{i}_{j}_{k}_{t}")
+                    m.addConstr(v_delta_M[i, j, k, t] <= Q3 * delta_agg[i, j, k, t], name=f"v_le_Q3delta_{i}_{j}_{k}_{t}")
+                    m.addConstr(
+                        v_delta_M[i, j, k, t] >= M_pool[j, k, t] - Q3 * (1 - delta_agg[i, j, k, t]),
+                        name=f"v_ge_M_minus_bigM_{i}_{j}_{k}_{t}",
+                    )
+                    m.addConstr(v_delta_M[i, j, k, t] >= 0, name=f"v_nonneg_{i}_{j}_{k}_{t}")
+                    m.addConstr(lhs_31 >= v_delta_M[i, j, k, t], name=f"sat_delta_{i}_{j}_{k}_{t}")
 
                     # Constraint (32): x and y_agg linkage
-                    m.addConstr(x[i, j, k, t] <= Q * y_agg[i, j, k, t], name=f"x_y_link_{i}_{j}_{k}_{t}")
+                    m.addConstr(x[i, j, k, t] <= Q1 * y_agg[i, j, k, t], name=f"x_y_link_{i}_{j}_{k}_{t}")
 
                     # Constraint (33): Opportunity cost lower bound if assigned
-                    m.addConstr(profit_ijk >= s[i, t] - Q * (1 - y_agg[i, j, k, t]), name=f"s_lb_{i}_{j}_{k}_{t}")
+                    m.addConstr(profit_ijk >= s[i, t] - Q2 * (1 - y_agg[i, j, k, t]), name=f"s_lb_{i}_{j}_{k}_{t}")
 
                     # Constraint (34): Opportunity cost upper bound / alternative formulation
-                    m.addConstr(s[i, t] >= profit_ijk - delta_agg[i, j, k, t] * Q, name=f"s_ub_{i}_{j}_{k}_{t}")
+                    m.addConstr(s[i, t] >= profit_ijk - delta_agg[i, j, k, t] * Q2, name=f"s_ub_{i}_{j}_{k}_{t}")
 
-                    # Constraint (36): Profit bound if workers are not fully dispatched
-                    m.addConstr(profit_ijk <= Q * z[i, t], name=f"profit_z_link_{i}_{j}_{k}_{t}")
+            # Constraint (36): s bound if workers are not fully dispatched
+            m.addConstr(s[i, t] <= Q2 * z[i, t], name=f"s_z_link_{i}_{t}")
 
     # --- Objective ---
     obj = 0
