@@ -15,15 +15,45 @@ class SolveResult:
     mip_gap: Optional[float]
     n_vars: int
     n_constrs: int
+    n_cb_invocations: int = 0
+    n_cuts_added: int = 0
     diag_basic_ok: Optional[bool] = None
     diag_stability_ok: Optional[bool] = None
     diag_basic_summary: Optional[str] = None
     diag_stability_summary: Optional[str] = None
 
 
+def _add_stability_cut(model: gp.Model, key: tuple) -> None:
+    """Add a pair of lazy stability cuts for the given (i, j, k, t) key."""
+    i, j, k, t = key
+    d = model._d
+    c = model._c
+    p = model._p
+    s = model._s
+    x = model._x
+    M_pool = model._M_pool
+    delta_agg = model._delta_agg
+    better_nodes = model._better_nodes
+    Mu = model._Mu
+    M_pool_ub = model._M_pool_ub
+
+    model._added_stability.add(key)
+    model._n_cuts_added += 1
+
+    delta_var = delta_agg[i, j, k, t]
+    model.cbLazy(s[i, t] >= p[j, k] - float(d[i, j]) - float(c[j, k]) - Mu * delta_var)
+
+    lhs_sat_expr = gp.LinExpr()
+    for ip in better_nodes[(i, j)]:
+        lhs_sat_expr += x[ip, j, k, t]
+    model.cbLazy(lhs_sat_expr + M_pool_ub * (1 - delta_var) >= M_pool[j, k, t])
+
+
 def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
     if where != GRB.Callback.MIPSOL:
         return
+
+    model._n_cb_invocations += 1
 
     eps = 1e-5
     Nodes = model._Nodes
@@ -39,9 +69,9 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
     delta_agg = model._delta_agg
 
     Mu = model._Mu
-    M_pool_ub = model._M_pool_ub
     better_nodes = model._better_nodes
     added = model._added_stability
+    strategy = model._strategy  # "most_violated" or "first_found"
 
     best_viol = 0.0
     best_key = None
@@ -90,27 +120,19 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
                         continue
 
                     delta_val = float(model.cbGetSolution(delta_agg[i, j, k, t]))
-                    # Violation of: s[i,t] >= v_alt - Mu * delta
                     viol = (v_alt - Mu * delta_val) - s_val
-                    if viol > best_viol:
-                        best_viol = viol
-                        best_key = key
 
-    if best_key is None:
-        return
+                    if strategy == "first_found":
+                        if viol > eps:
+                            _add_stability_cut(model, key)
+                            return
+                    else:  # most_violated
+                        if viol > best_viol:
+                            best_viol = viol
+                            best_key = key
 
-    i, j, k, t = best_key
-    added.add(best_key)
-    delta_var = delta_agg[i, j, k, t]
-
-    # If not saturated (delta=0), enforce opportunity cost >= alternative profit.
-    model.cbLazy(s[i, t] >= p[j, k] - float(d[i, j]) - float(c[j, k]) - Mu * delta_var)
-
-    # delta=1 implies task saturation by better-or-equal nodes.
-    lhs_sat_expr = gp.LinExpr()
-    for ip in better_nodes[(i, j)]:
-        lhs_sat_expr += x[ip, j, k, t]
-    model.cbLazy(lhs_sat_expr + M_pool_ub * (1 - delta_var) >= M_pool[j, k, t])
+    if strategy == "most_violated" and best_key is not None:
+        _add_stability_cut(model, best_key)
 
 
 def build_and_solve(
@@ -122,6 +144,7 @@ def build_and_solve(
     run_diagnostics: bool = True,
     check_stability: bool = True,
     check_min_mech: bool = True,
+    strategy: str = "most_violated",
 ) -> SolveResult:
     # ==========================================
     # 1. Data Generation (模拟数据)
@@ -363,6 +386,9 @@ def build_and_solve(
     m._delta_agg = delta_agg
     m._better_nodes = better_nodes
     m._added_stability = set()
+    m._strategy = strategy
+    m._n_cb_invocations = 0
+    m._n_cuts_added = 0
 
     # ==========================================
     # Solve
@@ -378,6 +404,8 @@ def build_and_solve(
         mip_gap=float(getattr(m, "MIPGap", 0.0)) if m.SolCount > 0 and m.IsMIP else None,
         n_vars=int(m.NumVars),
         n_constrs=int(m.NumConstrs),
+        n_cb_invocations=int(m._n_cb_invocations),
+        n_cuts_added=int(m._n_cuts_added),
     )
 
     if run_diagnostics and m.SolCount > 0:
@@ -417,6 +445,13 @@ def main() -> None:
     ap.add_argument("--time_limit", type=float, default=None)
     ap.add_argument("--mip_gap", type=float, default=None)
     ap.add_argument("--output_flag", type=int, default=1)
+    ap.add_argument(
+        "--strategy",
+        type=str,
+        default="most_violated",
+        choices=["most_violated", "first_found"],
+        help="Lazy cut selection strategy: most_violated (default) or first_found.",
+    )
     args = ap.parse_args()
 
     cfg, seed_in_config = load_linear_config(args.config)
@@ -430,10 +465,12 @@ def main() -> None:
         run_diagnostics=True,
         check_stability=True,
         check_min_mech=True,
+        strategy=args.strategy,
     )
     print(
-        f"seed={run_seed} status={res.status} runtime={res.runtime_sec:.2f}s obj={res.obj_val} gap={res.mip_gap} "
-        f"vars={res.n_vars} constrs={res.n_constrs}"
+        f"seed={run_seed} strategy={args.strategy} status={res.status} runtime={res.runtime_sec:.2f}s "
+        f"obj={res.obj_val} gap={res.mip_gap} vars={res.n_vars} constrs={res.n_constrs} "
+        f"cb_invocations={res.n_cb_invocations} cuts_added={res.n_cuts_added}"
     )
     if res.diag_basic_summary:
         print(res.diag_basic_summary)
