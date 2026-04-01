@@ -1,0 +1,3 @@
+file,T,total_bikes,n_nodes,total_workers,seed,runtime_sec,wall_sec,status,obj_val,mip_gap,n_vars,n_constrs,solver_rc,base_runtime_sec,base_mip_gap,seperation_runtime_sec,seperation_mip_gap,nested_runtime_sec,nested_mip_gap
+cfg_large_T_t200_b200_n20_w40.json,200,200,20,40,202701,,,,,,,,,,,,,,
+cfg_large_T_t400_b200_n20_w40.json,400,200,20,40,202702,,,,,,,,,,,,,,

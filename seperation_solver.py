@@ -43,6 +43,9 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
     better_nodes = model._better_nodes
     added = model._added_stability
 
+    best_viol = 0.0
+    best_key = None
+
     for t in Time:
         for i in Nodes:
             w_val = float(model.cbGetSolution(W_count[i, t]))
@@ -67,6 +70,8 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
             if u_cur == float("inf"):
                 u_cur = 0.0
 
+            s_val = float(model.cbGetSolution(s[i, t]))
+
             for j in Nodes:
                 for k in Nodes:
                     v_alt = float(model.cbGetSolution(p[j, k])) - float(d[i, j]) - float(c[j, k])
@@ -83,20 +88,29 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
                     key = (i, j, k, t)
                     if key in added:
                         continue
-                    added.add(key)
 
-                    delta_var = delta_agg[i, j, k, t]
+                    delta_val = float(model.cbGetSolution(delta_agg[i, j, k, t]))
+                    # Violation of: s[i,t] >= v_alt - Mu * delta
+                    viol = (v_alt - Mu * delta_val) - s_val
+                    if viol > best_viol:
+                        best_viol = viol
+                        best_key = key
 
-                    # If not saturated (delta=0), enforce opportunity cost >= alternative profit.
-                    model.cbLazy(s[i, t] >= p[j, k] - float(d[i, j]) - float(c[j, k]) - Mu * delta_var)
+    if best_key is None:
+        return
 
-                    # delta=1 implies task saturation by better-or-equal nodes.
-                    lhs_sat_expr = gp.LinExpr()
-                    for ip in better_nodes[(i, j)]:
-                        lhs_sat_expr += x[ip, j, k, t]
-                    model.cbLazy(lhs_sat_expr + M_pool_ub * (1 - delta_var) >= M_pool[j, k, t])
+    i, j, k, t = best_key
+    added.add(best_key)
+    delta_var = delta_agg[i, j, k, t]
 
-                    return
+    # If not saturated (delta=0), enforce opportunity cost >= alternative profit.
+    model.cbLazy(s[i, t] >= p[j, k] - float(d[i, j]) - float(c[j, k]) - Mu * delta_var)
+
+    # delta=1 implies task saturation by better-or-equal nodes.
+    lhs_sat_expr = gp.LinExpr()
+    for ip in better_nodes[(i, j)]:
+        lhs_sat_expr += x[ip, j, k, t]
+    model.cbLazy(lhs_sat_expr + M_pool_ub * (1 - delta_var) >= M_pool[j, k, t])
 
 
 def build_and_solve(

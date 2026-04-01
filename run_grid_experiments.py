@@ -226,6 +226,112 @@ def regenerate_short_complex_grid(
     print(f"Wrote manifest: {manifest}")
 
 
+def regenerate_large_T_grid(
+    manifest_path: str = "configs/large_T/manifest.csv",
+    grid_dir: str = "configs/large_T",
+) -> None:
+    """
+    Build long-horizon scenarios (T=200, T=400) intended for heuristic methods.
+    Fixed: 20 nodes, 200 bikes, 40 workers.
+    """
+    base_dir = Path(grid_dir)
+    manifest = Path(manifest_path)
+    base_dir.mkdir(parents=True, exist_ok=True)
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+
+    scenario_specs: List[Dict[str, int]] = [
+        {"T": 200, "n_nodes": 20, "total_bikes": 200, "total_workers": 40, "seed": 202701},
+        {"T": 400, "n_nodes": 20, "total_bikes": 200, "total_workers": 40, "seed": 202702},
+    ]
+
+    default_solver_tags = [_solver_tag(s) for s in DEFAULT_SOLVERS]
+    rows: List[Dict[str, str]] = []
+    for spec in scenario_specs:
+        T = spec["T"]
+        n_nodes = spec["n_nodes"]
+        total_bikes = spec["total_bikes"]
+        total_workers = spec["total_workers"]
+        seed = spec["seed"]
+
+        cfg = LinearScenarioConfig(
+            n_nodes=n_nodes,
+            T=T,
+            total_bikes=total_bikes,
+            total_workers=total_workers,
+            demand_level=0.6,
+            base_demand_by_node=_complex_base_demand(n_nodes, total_bikes, seed),
+            time_multipliers=_complex_time_multipliers(T, seed + 997),
+            od_dirichlet_alpha=0.35,
+            coord_scale=14.0 + (n_nodes / 4.0),
+            d_base=1.0,
+            d_slope=0.12,
+            c_base=1.0,
+            c_slope=0.15,
+            c_diag_constant=1.0,
+            phi_base=0.03,
+            phi_slope=0.02,
+            phi_min=0.01,
+            phi_max=0.45,
+            revenue_level=8.0,
+            penalty_Cp=3.0,
+            price_ub=12.0,
+            bigM_Q=10000.0,
+            initial_backlog_level=2,
+            enforce_integer_lags=True,
+        )
+
+        file_name = f"cfg_large_T_t{T}_b{total_bikes}_n{n_nodes}_w{total_workers}.json"
+        save_linear_config(cfg, str(base_dir / file_name), seed=seed)
+
+        row = {
+            "file": file_name,
+            "T": str(T),
+            "total_bikes": str(total_bikes),
+            "n_nodes": str(n_nodes),
+            "total_workers": str(total_workers),
+            "seed": str(seed),
+            "runtime_sec": "",
+            "wall_sec": "",
+            "status": "",
+            "obj_val": "",
+            "mip_gap": "",
+            "n_vars": "",
+            "n_constrs": "",
+            "solver_rc": "",
+        }
+        for tag in default_solver_tags:
+            row[f"{tag}_runtime_sec"] = ""
+            row[f"{tag}_mip_gap"] = ""
+        rows.append(row)
+
+    fields = [
+        "file",
+        "T",
+        "total_bikes",
+        "n_nodes",
+        "total_workers",
+        "seed",
+        "runtime_sec",
+        "wall_sec",
+        "status",
+        "obj_val",
+        "mip_gap",
+        "n_vars",
+        "n_constrs",
+        "solver_rc",
+    ]
+    for tag in default_solver_tags:
+        fields.extend([f"{tag}_runtime_sec", f"{tag}_mip_gap"])
+
+    with manifest.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+
+    print(f"Regenerated {len(rows)} configs in {base_dir}")
+    print(f"Wrote manifest: {manifest}")
+
+
 def run_grid(
     manifest_path: str = "configs/grid_from_test/manifest.csv",
     grid_dir: str = "configs/grid_from_test",
@@ -417,6 +523,26 @@ def _build_cli() -> argparse.ArgumentParser:
         action="store_true",
         help="Only regenerate configs + manifest, do not run solver.",
     )
+    ap.add_argument(
+        "--regenerate_large_T",
+        action="store_true",
+        help="Regenerate the large-T config set (T=200, T=400) before running.",
+    )
+    ap.add_argument(
+        "--regenerate_large_T_only",
+        action="store_true",
+        help="Only regenerate large-T configs + manifest, do not run solver.",
+    )
+    ap.add_argument(
+        "--large_T_manifest_path",
+        type=str,
+        default="configs/large_T/manifest.csv",
+    )
+    ap.add_argument(
+        "--large_T_grid_dir",
+        type=str,
+        default="configs/large_T",
+    )
     return ap
 
 
@@ -424,7 +550,9 @@ if __name__ == "__main__":
     args = _build_cli().parse_args()
     if args.regenerate or args.regenerate_only:
         regenerate_short_complex_grid(args.manifest_path, args.grid_dir)
-    if not args.regenerate_only:
+    if args.regenerate_large_T or args.regenerate_large_T_only:
+        regenerate_large_T_grid(args.large_T_manifest_path, args.large_T_grid_dir)
+    if not args.regenerate_only and not args.regenerate_large_T_only:
         if args.solver:
             solver_list = [args.solver.strip()]
         else:
