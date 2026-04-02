@@ -144,7 +144,7 @@ def build_and_solve(
     run_diagnostics: bool = True,
     check_stability: bool = True,
     check_min_mech: bool = True,
-    strategy: str = "most_violated",
+    strategy: str = "first_found",
 ) -> SolveResult:
     # ==========================================
     # 1. Data Generation (模拟数据)
@@ -448,9 +448,9 @@ def main() -> None:
     ap.add_argument(
         "--strategy",
         type=str,
-        default="most_violated",
+        default="first_found",
         choices=["most_violated", "first_found"],
-        help="Lazy cut selection strategy: most_violated (default) or first_found.",
+        help="Lazy cut selection strategy: first_found (default) or most_violated.",
     )
     args = ap.parse_args()
 
