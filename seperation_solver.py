@@ -75,6 +75,7 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
 
     best_viol = 0.0
     best_key = None
+    violated_keys = []  # for all_violated strategy
 
     for t in Time:
         for i in Nodes:
@@ -126,13 +127,19 @@ def _aggregate_stability_lazy_cb(model: gp.Model, where: int) -> None:
                         if viol > eps:
                             _add_stability_cut(model, key)
                             return
-                    else:  # most_violated
+                    elif strategy == "most_violated":
                         if viol > best_viol:
                             best_viol = viol
                             best_key = key
+                    else:  # all_violated
+                        if viol > eps:
+                            violated_keys.append(key)
 
     if strategy == "most_violated" and best_key is not None:
         _add_stability_cut(model, best_key)
+    elif strategy == "all_violated":
+        for key in violated_keys:
+            _add_stability_cut(model, key)
 
 
 def build_and_solve(
@@ -144,7 +151,7 @@ def build_and_solve(
     run_diagnostics: bool = True,
     check_stability: bool = True,
     check_min_mech: bool = True,
-    strategy: str = "first_found",
+    strategy: str = "all_violated",
 ) -> SolveResult:
     # ==========================================
     # 1. Data Generation (模拟数据)
@@ -171,12 +178,16 @@ def build_and_solve(
     Mu = float(price_ub) + max_d + max_c
     M_pool_ub = float(sum(A_init[i] + U_init[i] for i in Nodes))
     W_ub = float(sum(W_init[i] for i in Nodes))
+    total_bikes = float(sum(A_init[i] + U_init[i] for i in Nodes))
+    max_demand = float(max(D_i[i, t] for i in Nodes for t in Time))
+    max_init_pool = float(max((M_init[i, j] for i in Nodes for j in Nodes), default=0.0))
+    Q3 = max(total_bikes, max_demand, max_init_pool)
 
     # ==========================================
     # Model Formulation
     # ==========================================
     m = gp.Model("Latex_Strict_Implementation")
-    m.Params.NonConvex = 2  # 允许非凸二次约束 (alpha * A, p * m)
+    m.Params.NonConvex = 2  # 目标函数含双线性项 p * m_tilde
     m.Params.OutputFlag = int(output_flag)
     m.Params.Seed = 1
     m.Params.LazyConstraints = 1
@@ -214,7 +225,7 @@ def build_and_solve(
 
     # Pricing & Control
     p = m.addVars(Nodes, Nodes, lb=0, ub=price_ub, name="p")  # p_ij (Static as per Latex notation, or implied static)
-    alpha = m.addVars(Nodes, Time, lb=0, ub=1, name="alpha")
+    beta = m.addVars(Nodes, Time, vtype=GRB.BINARY, name="beta")
 
     # --- Initialization (t=0) ---
     for i in Nodes:
@@ -231,12 +242,10 @@ def build_and_solve(
         for i in Nodes:
             m.addConstr(Y_i[i, t] <= A[i, t], name=f"Y_le_A_{i}_{t}")
             m.addConstr(Y_i[i, t] <= D_i[i, t], name=f"Y_le_D_{i}_{t}")
-            # Min mechanism: Y >= alpha*A + (1-alpha)*D
-            # With Y<=A and Y<=D and positive revenue/penalty, Y should end up at min(A,D).
-            m.addConstr(
-                Y_i[i, t] >= alpha[i, t] * A[i, t] + (1 - alpha[i, t]) * D_i[i, t],
-                name=f"Y_min_mech_{i}_{t}",
-            )
+            # Min mechanism linearization: Y_i = min(A_i, D_i) via binary beta + Big-M.
+            # beta=1 => Y >= A (A is binding); beta=0 => Y >= D (D is binding).
+            m.addConstr(Y_i[i, t] >= A[i, t] - Q3 * (1 - beta[i, t]), name=f"Y_min_A_lb_{i}_{t}")
+            m.addConstr(Y_i[i, t] >= D_i[i, t] - Q3 * beta[i, t], name=f"Y_min_D_lb_{i}_{t}")
 
             # Lost Demand
             m.addConstr(L_i[i, t] == D_i[i, t] - Y_i[i, t])
@@ -448,9 +457,9 @@ def main() -> None:
     ap.add_argument(
         "--strategy",
         type=str,
-        default="first_found",
-        choices=["most_violated", "first_found"],
-        help="Lazy cut selection strategy: first_found (default) or most_violated.",
+        default="all_violated",
+        choices=["most_violated", "first_found", "all_violated"],
+        help="Lazy cut selection strategy: all_violated (default), first_found, or most_violated.",
     )
     args = ap.parse_args()
 
