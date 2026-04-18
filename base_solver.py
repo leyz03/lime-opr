@@ -111,7 +111,7 @@ def build_and_solve(
         m.addConstr(U[i, 0] == U_init[i])
         m.addConstr(W_count[i, 0] == W_init[i])  # 简化初始化
         for j in Nodes:
-            m.addConstr(M_pool[i, j, 0] == M_init[i, j])
+            m.addConstr(M_pool[i, j, 0] == M_init[i, j] + m_hat[i, j, 0])
 
     # --- Constraints Loop ---
     for t in Time:

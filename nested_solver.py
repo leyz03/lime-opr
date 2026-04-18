@@ -503,7 +503,7 @@ def build_and_solve(
     for i in nodes:
         mp.addConstr(W_count[i, 0] == float(W_init[i]), name=f"init_W_{i}")
         for j in nodes:
-            mp.addConstr(M_pool[i, j, 0] == float(M_init[i, j]), name=f"init_M_{i}_{j}")
+            mp.addConstr(M_pool[i, j, 0] == float(M_init[i, j]) + m_hat[i, j, 0], name=f"init_M_{i}_{j}")
 
     for w in workers:
         for i in nodes:
