@@ -6,280 +6,107 @@
 
 ---
 
-## Table of Contents
-1. [Model Overview](#1-model-overview)
-2. [State & Decision Variables](#2-state--decision-variables)
-3. [Scenario & Config Settings](#3-scenario--config-settings)
-4. [SDDiP Algorithm Procedure](#4-sddip-algorithm-procedure)
-5. [Cut Types & Duality Handlers](#5-cut-types--duality-handlers)
-6. [File Structure](#6-file-structure)
-7. [Experiment Log](#7-experiment-log)
+## Implementation Steps (SDDP.jl Migration)
 
----
+迁移策略：保留现有约束逻辑，替换框架层为 SDDP.jl `LinearPolicyGraph`。
 
-## 1. Model Overview
-
-### Problem
-Multi-period stochastic MILP for a bike-sharing operator.  
-**Objective:** Maximize expected (revenue − lost-demand penalty − worker wage cost) over T periods.
-
-### Stochasticity
-Demand `D_i[i,t]` is stochastic: drawn from Poisson(mean) with Dirichlet OD splits.  
-All other parameters (d, c, phi, R) are deterministic and fixed at scenario build time.
-
-### Why SDDiP (not standard SDDP)
-The task pool `M_pool[i,j,t]` and worker dispatch `x[i,j,k,t]` are **integer** variables.  
-Standard SDDP cuts (from LP relaxation duals) are not valid for integer feasibility sets.  
-SDDiP uses **Lagrangian cuts** which remain valid for integer state variables.
-
-> **Convergence note:** SDDiP is guaranteed to converge to global optimum only when all
-> *state* variables (those linking stages) are **binary**. With general-integer states
-> (e.g. M_pool, W_count), the algorithm is a high-quality heuristic.
-> Binary approximation of state variables can restore the guarantee at the cost of model size.
-
----
-
-## 2. State & Decision Variables
-
-### State variables (link period t → t+1)
-| Variable | Type | Dimension | Description |
+| Step | 文件 | 职责 | 状态 |
 |---|---|---|---|
-| `A[i,t]` | Continuous | n | Available bikes at node i |
-| `U[i,t]` | Continuous | n | Bikes in repair at node i |
-| `M_pool[i,j,t]` | Integer | n×n | Task backlog (i→j) |
-| `W_count[i,t]` | Integer (agg.) | n | Workers at node i |
+| 1 | `Project.toml` | 添加 SDDP v1.13.1 + Gurobi v1.9.2 依赖 | ✅ 2026-04-18 |
+| 2 | `src/parameters.jl` | `LinearScenarioConfig` + `BikeParams` struct + `build_params()` | ✅ 2026-04-18 |
+| 3 | `src/scenarios.jl` | per-stage SAA：`sample_scenarios(params, t, K) -> (Ω, P)` | ✅ 2026-04-18 |
+| 4 | `src/states_int.jl` | `declare_states_int!(sp, p)` — `SDDP.State` 整数编码 | ✅ 2026-04-18 |
+| 4B | `src/states_bin.jl` | `declare_states_bin!(sp, p)` — 二进制展开编码 | ✅ 2026-04-18 |
+| 5 | `src/controls.jl` | `declare_controls!(sp, p)` — local variables | ✅ 2026-04-18 |
+| 6 | `src/constraints.jl` | 5 组约束函数（需求/任务/pipeline/转移/稳定匹配） | ✅ 2026-04-18 |
+| 7 | `src/objective.jl` | `add_stage_objective!(sp, p)` — `@stageobjective` | ✅ 2026-04-18 |
+| 8 | `src/build_model.jl` | `build_model(p; encoding, K)` — `SDDP.LinearPolicyGraph` 组装 | ✅ 2026-04-19 |
+| 9 | `src/train.jl` | `train_with_handler(model, handler; kwargs)` — 5 种 duality handler | ✅ 2026-04-19 |
+| 10 | `src/simulate.jl` | `evaluate_policy(model, p; nsim)` — bound + simulation CI | ✅ 2026-04-19 |
+| 11 | `run_experiment.jl` | 2×4 析因实验（encoding × handler） | ✅ 2026-04-19 |
 
-### Per-stage decision variables
-| Variable | Type | Description |
-|---|---|---|
-| `Y_i[i,t]` | Continuous | Bikes served at node i |
-| `Y_ij[i,j,t]` | Continuous | OD flow i→j |
-| `L_i[i,t]` | Continuous | Lost demand at i |
-| `m_hat[i,j,t]` | Integer | Tasks created |
-| `m_tilde[i,j,t]` | Continuous | Tasks matched |
-| `x[i,j,k,t]` | Integer | Aggregate worker flow |
-| `p[j,k]` | Continuous | Static pricing |
-| `s[i,t]` | Continuous | Opportunity cost shadow price |
-| `y_agg, delta_agg, z` | Binary | Stable-matching indicators |
+### Step 11 — `run_experiment.jl` ✅
+- 2×4 析因：`encoding ∈ {:int,:bin}` × `handler ∈ {:CCD,:SCD,:LD,:Bandit}`
+- `--smoke` 模式（3 iter, K=5, nsim=20）用于快速验证；完整模式 100 iter / 600s / K=20 / nsim=500
+- try/catch 捕获单格失败，不中断全局实验
+- 结果打印 2×4 汇总表并写入 `results/exp_2x4_factorial.csv`
+- smoke test 结果（3 iter）：7/8 格成功；`(bin, LD)` 因 bundle 3 步不收敛报 Inf/NaN（已知 §12 陷阱，try/catch 捕获）
 
-### Stage coupling constraints (state transitions)
-```
-A[j, t+1] = A[j,t] - Y_i[j,t] + F[j,t] - Σ_{k≠j} m_hat[j,k,t] + incoming_x[j,t]
-U[j, t+1] = U[j,t] + F_bar[j,t] - completed_swaps[j,t]
-M_pool[i,j,t+1] = M_pool[i,j,t] - m_tilde[i,j,t] + m_hat[i,j,t+1]
-W_count[k,t+1] = W_count[k,t] - leaving[k,t] + arriving[k,t]
-```
+### Step 10 — `src/simulate.jl` ✅
+- `evaluate_policy(model, p; nsim=500)` → `(μ, ci, bound, gap_pct, sims)`
+- `SDDP.simulate` 记录 `:Y_i/:Y_ij/:L_i/:m_hat/:m_tilde/:x/:s_i`，`skip_undefined_variables=true` 兼容两种编码
+- 3 个 custom recorder：`served_revenue / lost_penalty / task_payment`，验证 revenue-penalty-wage ≈ stage_objective ✓
+- `confidence_interval(objectives, 1.96)` → 95% CI 半宽
+- gap = (bound − μ) / max(|bound|, |μ|, 1) × 100
+- `print_report(result)` 打印汇总
+- smoke test（n=3, T=2, 5 iter, 50 sim）：int 编码 gap=60%，bin 编码 gap=60%，recorders 误差 < 1e-4 ✓
 
----
+### Step 9 — `src/train.jl` ✅
+- `train_with_handler(model, handler_symbol; iter_limit, time_limit, stall_iters, stall_tol, print_level)`
+- 支持 5 种 handler：`:CCD` / `:SCD` / `:LD` / `:FDD` / `:Bandit`
+- `BanditDuality` 包含 CCD+SCD+LD 三臂，自适应选择
+- `BoundStalling(stall_iters, stall_tol)` 作为停止规则（默认 20 轮无改善 1e-4）
+- smoke test（n=3, T=2, K=3, 3 iterations）：5 种 handler 均无错；CCD/SCD/LD/Bandit 均从 4003 降至约 -300；FDD 整数编码下需更多迭代才能收紧（已标注，非 bug）
 
-## 3. Scenario & Config Settings
+### Step 8 — `src/build_model.jl` ✅
+- `build_model(p; encoding, K)` 组装 `SDDP.LinearPolicyGraph`
+- 预生成所有阶段场景 `stage_scenarios[t]`，在 `do sp, t` 块内顺序调用 states→controls→constraints→objective→parameterize
+- `_upper_bound(p) = T × n² × R_max × B_max`（宽松有限上界，防止 Inf 导致 SDDP 崩溃）
+- `parameterize` 回调：`fix D_i/D_ij`，`set_normalized_coefficient` 更新 ρ
+- smoke test：两种编码均完成 1 次完整前向+后向迭代；bound 从 8370 降至 -174.4 ✓
 
-### LinearScenarioConfig fields (scenario.jl)
-| Field | Default | Description |
-|---|---|---|
-| `n_nodes` | — | Number of geographic nodes |
-| `T` | — | Number of time periods (stages) |
-| `total_bikes` | — | Total bikes in system |
-| `total_workers` | — | Total workers in system |
-| `demand_level` | 0.6 | Mean demand as fraction of total_bikes |
-| `base_demand_by_node` | nothing | Per-node mean demand override |
-| `time_multipliers` | ones(T) | Per-period demand scaling |
-| `od_dirichlet_alpha` | 1.0 | Dirichlet concentration (higher = more uniform OD split) |
-| `coord_scale` | 10.0 | Node coordinate range [0, scale]² |
-| `d_base / d_slope` | 1.0 / 0.10 | Worker travel time = base + slope × dist |
-| `c_base / c_slope` | 1.0 / 0.10 | Service time = base + slope × dist |
-| `c_diag_constant` | 1.0 | Same-node service time (min 3 after rounding) |
-| `phi_base / phi_slope` | 0.05 / 0.01 | Failure prob = base + slope × dist |
-| `phi_min / phi_max` | 0.0 / 0.60 | Failure prob clamp range |
-| `phi_override` | nothing | Direct n×n failure matrix (overrides linear) |
-| `revenue_level` | 20.0 | R[i,j] per served trip |
-| `penalty_Cp` | 50.0 | Lost-demand penalty per unit |
-| `price_ub` | 100.0 | Upper bound on task price p[j,k] |
-| `initial_backlog_level` | 0 | M_init[i,j] at t=1 |
-| `demand_model` | `:poisson` | `:poisson` or `:deterministic` |
+### Step 7 — `src/objective.jl` ✅
+- `add_stage_objective!(sp, p, cv)` 用 `@stageobjective` 实现三项线性目标
+- 收益项 `Σ R_ij·Y_ij`，惩罚项 `-C_p·L_i`，工资项 `-p_jk·m_tilde_jk`
+- 价格 p_jk 固定参数 → 纯线性，与全部五种 duality handler 兼容
+- smoke test：1-stage LinearPolicyGraph，calculate_bound 有限（= -250.0），两种编码均通过
 
-### StaticParams matrices (1-based Julia indexing)
-| Field | Shape | Notes |
-|---|---|---|
-| `dist` | n×n | Euclidean distance between node coords |
-| `d` | n×n Int | Travel lag; d[i,j] ≥ 0 |
-| `c` | n×n Int | Service lag; c[i,i] ≥ 3 (min after rounding) |
-| `phi` | n×n Float64 | Clamped to [phi_min, phi_max] |
-| `R` | n×n Float64 | Constant = revenue_level |
-| `A_init, U_init, W_init` | n Int | Largest-remainder allocation by demand weights |
-| `M_init` | n×n Int | All entries = initial_backlog_level |
+### Step 6 — `src/constraints.jl` ✅
+- `add_constraints!(sp, p, sv, cv) -> c_split` 实现 5 组约束
+- Group 1: `Y_i ≤ A_in`, `Y_i ≤ D_i`（最大化下等价 min）；`c_split` 返回供 parameterize 更新 ρ
+- Group 2: swap 任务限 `U_in+F_bar_j`，move 任务限 `A_in-Y_i`
+- Group 3: `F_j/F_bar_j` 含 t_ij=1 直接返回 + P pipeline 到期；P/G pipeline shift + entry 约束
+- Group 4: m_tilde=Σx，M_out，A/U/W 转移含 δ=1 即时 worker 直接项
+- Group 5: deltaM, Qeta, si_lower, si_bigger_if_not_full（per i,j,k）+ lazy_worker, stability_end（per i）
+- smoke test：n=3 实例 237 条约束，整数/二进制两种编码均通过
 
----
+### Step 1 — 依赖安装 ✅
+- SDDP v1.13.1、Gurobi v1.9.2 安装并 precompile
+- Gurobi Academic license (2595650) 验证通过
+- 注意：代码中 `termination_status` 需加 `JuMP.` 前缀（SDDP 同名导出冲突）
 
-## 4. SDDiP Algorithm Procedure
+### Step 5 — `src/controls.jl` ✅
+- 16 个局部变量：`m_hat`(Int), `m_tilde`(Cont.), `x`(Int), `Y_i/Y_ij/L_i/F_j/F_bar_j`(Cont.), `alpha_i`∈[0,1], `delta_ijk/eta_ijk/zeta_i`(Bin), `s_i`(free real), `D_ij/D_i`(占位)
+- `s_i` 无下界（修正原代码 `>= 0` 的 bug），`has_lower_bound` 验证通过
+- `D_ij/D_i` 为需求占位变量，由 `SDDP.parameterize` 每期 fix
+- 与 `states_int` 和 `states_bin` 两种编码均兼容（无命名冲突）
 
-### High-level loop
-```
-Input:  StaticParams, N_scenarios, ε (tolerance), max_iter
-Output: Policy (cut approximation of value functions V_t)
+### Step 4 — `src/states_int.jl` + `src/states_bin.jl` ✅
+- 两个文件返回相同结构的 NamedTuple（`A_in/A_out`, `U/W/M`, `P_in/P_out`, `G_in/G_out`, `P_idx`, `G_idx`），constraints.jl 编码无关
+- 整数编码：值为 `VariableRef`（`sp[:A][j].in`）
+- 二进制编码：值为 `AffExpr`（`Σ 2^(l-1) · λ[j,l].in`），κA=5 位（B_max=30）
+- Pipeline 索引用嵌套 `for` 推导（不能用逗号分隔，否则 range 无法依赖外层变量）
+- n=3 实例：P_idx 6 条，G_idx 45 条，δ_ijk max=4
 
-Initialize: V_t(s) = +∞ for all stages t, upper bound UB = +∞, lower bound LB = -∞
+### Step 3 — `src/scenarios.jl` ✅
+- `sample_scenarios(params, t, K)` → `(Ω, P)`，每个 `ω` 含 `D, D_i, ρ` NamedTuple
+- 采样模型：node-total `Poisson(Σ_j λ_ijt)` × `Dirichlet(α)` OD split
+- `ρ[i,j] = split[j]`（直接用 Dirichlet 样本，D_i=0 时仍有定义）
+- `build_stage_scenarios(params, K; seed)` 预生成全 T 期场景，seed 固定可复现
+- smoke test：shape/weights/row-sum/非负/E[D_i]≈λ 全部通过
+- `BikeParams` 补充 `od_dirichlet_alpha` 字段（Step 2 小修）
 
-For iter = 1, 2, ..., max_iter:
-
-  ── Forward Pass ────────────────────────────────────────────
-  Sample one demand path ξ = (ξ_1, ..., ξ_T) from Poisson+Dirichlet
-  For t = 1 → T:
-    Solve stage-t subproblem given (state_t, ξ_t, current cuts on V_{t+1})
-    Record decisions x_t*, state_t+1
-
-  Update UB estimate (sample average of stage-1 problem value)
-
-  ── Backward Pass ───────────────────────────────────────────
-  For t = T → 1:
-    For each scenario ω in {1..N_scenarios}:
-      Fix state_t = state recorded in forward pass
-      Solve stage-t subproblem with Lagrangian duality handler
-      Compute subgradient π_t of V_t w.r.t. state_t
-      Add cut to stage t-1:
-        V_t(s) ≥ V_t(state_t*) + π_t · (s - state_t*)
-
-  Update LB = value of stage-1 problem with all cuts
-
-  ── Convergence Check ───────────────────────────────────────
-  If (UB - LB) / |LB| < ε → stop
-```
-
-### Stage subproblem structure (per period t)
-```
-Given:  state_in = (A_t, U_t, M_t, W_t)  [fixed from previous stage / forward pass]
-        demand ξ_t = (D_i, D_pair)
-        value function approximation θ_{t+1} (cuts from backward pass)
-
-max   revenue(t) - penalty(t) - wage_cost(t) + θ_{t+1}(state_out)
-s.t.  demand satisfaction constraints
-      return / repair dynamics (F, F_bar)
-      task generation limits (m_hat)
-      worker dispatch constraints (x, W_count)
-      task pool dynamics (M_pool)
-      aggregate stable-matching constraints (Eqs 31–36)
-      state_out = transition(state_in, decisions)
-      θ_{t+1} ≥ cut_intercept + cut_slope · state_out   [for each cut]
-```
+### Step 2 — `src/parameters.jl` ✅
+- `BikeParams` 包含 `t_ij, d_ij, c_ij, δ_ijk, φ_ij, R_ij, C_p, p_jk, λ_ijt, B_max, W_tot, M_max, A0/U0/W0/M0, Q1/Q2/Q3`
+- `t_ij = c_ij`（本模型骑行时间 = 任务完成时间，同一矩阵）
+- `λ_ijt[i,j,t] = base_demand[i] * time_mult[t] / n`（均匀 Dirichlet 期望）
+- **修正 Big-M bug**：`Q2 = price_ub`（原 `stage_problem.jl` 用 `price_ub - min_d - min_c` 可能过小）
+- `Q3 = Σ(A0+U0) + Σ|M0| + 1`
+- smoke test 全部断言通过（n=3, T=4 实例）
 
 ---
 
-## 5. Cut Types & Duality Handlers
-
-SDDP.jl duality handler options (set per `SDDP.train(..., duality_handler=...)`):
-
-| Handler | Valid for integers? | Speed | Notes |
-|---|---|---|---|
-| `ContinuousConicDuality` | No (LP relaxation) | Fast | Good warm-start; not valid cuts for int. states |
-| `LagrangianDuality` | **Yes** | Slow | True SDDiP; solves many MIPs per cut |
-| `StrengthenedConicDuality` | Partial | Medium | Strengthens LP cuts; tighter than conic alone |
-| `BanditDuality` | Mixed | Adaptive | Auto-selects between Lagrangian and conic |
-
-**Planned default:** `BanditDuality` — adaptively mixes fast LP cuts with Lagrangian cuts.
-
-### Cut storage
-Each cut at stage t is: `V_{t+1}(s) ≥ intercept + Σ_i slope_i * s_i`  
-State vector `s = (A, U, M_pool_flat, W_count)` — dimensions: n + n + n² + n = n(n+3).
-
----
-
-## 9. Cut Theory & Implementation Notes
-
-### Why standard Benders cuts fail for integer state
-
-LP-relaxation duals give cuts of the form θ ≥ obj_LP + π·(s − s*).
-This is valid only for the LP-relaxation feasible set, not the integer one.
-For integer s, the dual π changes discontinuously at integer breakpoints, so the cut can be violated.
-
-### Strengthened Benders cut — binary projection
-
-Step 1: Solve LP relaxation (relax_integrality, optimize!).
-Step 2: Get dual π from state-out coupling constraints.
-Step 3: For each integer state component z with slope π_z, replace with:
-  $Σ_l π_z · 2^(l-1) · b_l$  (slope on binary bit l)
-Intercept: $ obj_LP − π · s*_LP $(using LP values, not integer values).
-Valid because whenever the binary expansion equals s*, the cut evaluates to obj_LP.
-
-### Lagrangian cut — subgradient method
-
-The Lagrangian dual:  L(λ) = h(λ) − λ · s,  h(λ) = max_{d∈X}[f(d) + λ·state_out(d)]
-Since L(λ) ≥ V(s) for all λ, s, the cut  θ ≥ h(λ*) − λ*·s  is always valid.
-No LP relaxation needed — h(λ) is solved as a MIP.
-Subgradient: ∇L = state_out*(λ) − s_target.
-Step size: Polyak-style (decaying α = init_step/√iter in first implementation).
-Convergence: when ‖∇L‖ < ε or iter limit reached.
-
-### Integer L-shaped cut
-
-For a solved MIP at state s* with value V*:
-  θ ≥ V_lb + (V* − V_lb) · (Σ_{b*=1} b_l − Σ_{b*=0}(1−b_l) − count(b*=1) + 1)
-This is tight at s* and ≤ V_lb elsewhere (binary feasible set).
-Requires a valid lower bound V_lb (e.g. 0 if revenue − penalty is always ≥ 0).
-
-### Binary expansion bounds
-Integer state: M_residual, W_count, X_pipe.
-Upper bounds (M_ub, W_ub, X_ub) computed conservatively from params.
-Revision needed: if W_count or M_residual can grow beyond the initial totals at runtime.
-
-### Open issues
-- `_solve_lagrangian_sp`: future cuts (θ_{t+1} approximation) are not yet passed through
-  the binary-expanded mechanism. Currently ignored (treated as terminal). Fix in sddip_solver.jl.
-- Step size rule: Polyak step requires a known lower bound L_lb; currently uses fixed decaying step.
-- Pricing: p[j,k] treated as fixed parameter; pricing optimisation not yet implemented.
-
----
-
-## 8. Design Caveats & Revision Notes
-
-### MAX_LAG = 2 approximation
-`d[i,j] + c[j,k]` values exceeding 2 are **clamped to 2**.
-
-| Affected quantity | Impact |
-|---|---|
-| `F[j,t]`, `F_bar[j,t]` | c[i,j] ≥ 3 (e.g. c[i,i] ≥ 3 for same-node swaps) treated as lag=2 — bike returns appear one period early |
-| `A_out[j]` | incoming worker arrivals with d+c ≥ 3 shifted to pipeline slot 2 — arrive 1+ periods early |
-| `W_out[k]` | same as above for worker counts |
-
-**Revision trigger:** if `max(d_base + d_slope × max_dist) + max(c_base + c_slope × max_dist) > 2`, raise `MAX_LAG`.  
-With default config (coord_scale=10, d_slope=c_slope=0.10): max d ≈ 2, max c ≈ 2, max d+c ≈ 4. So clamping is active for farther node pairs.
-
-### Pricing treated as fixed parameter
-`p[j,k]` is passed as a `Matrix{Float64}` into `build_stage_problem`, not optimised per stage. This eliminates the bilinear `p * m_tilde` term from the stage objective, keeping every stage problem a pure linear MIP with valid LP relaxation duals.  
-**Revision needed:** add a first-stage pricing problem or carry `p` as a continuous state variable with trivial dynamics `p_out = p_in`.
-
-### M_residual state definition
-The task pool state variable is `M_residual = M_pool − m_tilde` (pool after matching).  
-At stage t+1: `M_pool_{t+1} = M_residual_in + m_hat_{t+1}` (m_hat added at the start of each stage).  
-This resolves the cross-stage dependency `M_pool[t+1] = M_pool[t] − m_tilde[t] + m_hat[t+1]` from the original model.
-
-### p optimisation (not yet implemented)
-The outer SDDiP loop must supply `prices` to each stage call. Options for future implementation:
-1. Treat `p` as part of the stage-1 state; carry forward with slope=0 dynamics.
-2. Solve a separate outer pricing optimisation (bilevel or relaxation).
-
----
-
-## 6. File Structure
-
-```
-SDDiP/
-├── RECORD.md          ← this file
-├── Project.toml       ← Julia dependencies (Distributions, SDDP, JuMP, ...)
-├── scenario.jl        ← LinearScenarioConfig, StaticParams, DemandRealization,
-│                         build_static_params(), sample_demand(), generate_scenarios()
-├── stage_problem.jl   ← [TODO] single-period JuMP subproblem builder
-├── sddip_solver.jl    ← [TODO] SDDP.jl policy graph + train/simulate wrappers
-└── experiments/       ← [TODO] experiment runner scripts and result CSVs
-```
-
-### Planned dependencies (to add to Project.toml)
-- `SDDP` — policy graph, forward/backward pass, cut management
-- `JuMP` — algebraic model builder
-- `Gurobi` or `HiGHS` — MIP solver backend (Gurobi required for Lagrangian duality on MIPs)
-
----
-
-## 7. Experiment Log
+## Experiment Log
 
 ### Config Defaults (baseline)
 ```
@@ -302,20 +129,23 @@ phi_base=0.05, phi_slope=0.01
 ---
 
 ### EXP-002 — Stage subproblem feasibility
-**Date:** —  
-**Purpose:** Verify single-stage JuMP subproblem is feasible and matches Python base_solver objective on the same demand draw.  
-**Config:** *(to fill)*  
-**Result:** *(pending)*  
-**Notes:** Compare against `base_solver.py` deterministic solve on equivalent input.
+**Date:** 2026-04-19  
+**Purpose:** Verify single-stage JuMP subproblem matches Python base_solver objective on identical demand draw.  
+**Config:** n=3, T=1, total_bikes=12, total_workers=6, c_base=2.0 (no pipeline returns), seed=42  
+**Result:** ✅ MATCH — Julia obj=144.0000, Python obj=144.0, diff=2.8e-14  
+**Notes:**  
+- Scripts: `compare_py.py` (Python, Lime root), `SDDiP/compare_jl.jl` (Julia), params in `SDDiP/compare_params.json`  
+- Alignment: prices fixed at 50, Q2=price_ub=100, s free (no lb), c_base=2 ensures F=F_bar=0 at T=1  
+- Optimal: all demand served (Y_i=D_i=2.4), no tasks posted (wage cost=0), revenue=144
 
 ---
 
-### EXP-003 — SDDiP convergence (small instance)
-**Date:** —  
-**Purpose:** First end-to-end SDDiP run; check UB/LB convergence.  
-**Config:** n_nodes=3, T=4, N_scenarios=50, duality=BanditDuality  
-**Result:** *(pending)*  
-**Notes:** —
+### EXP-003 — SDDiP convergence (small instance) — smoke
+**Date:** 2026-04-19  
+**Purpose:** First end-to-end SDDiP run; check 2×4 factorial structure works.  
+**Config:** n=3, T=4, K=5, iter=3, nsim=20 (smoke mode), seed=42  
+**Result:** 7/8 cells OK；`(bin,LD)` 3步 Lagrangian bundle 发散（Inf/NaN，try/catch捕获）  
+**Notes:** 完整实验待运行：`julia --project=. run_experiment.jl`（100 iter, K=20, nsim=500）
 
 ---
 
