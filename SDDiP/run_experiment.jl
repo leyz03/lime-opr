@@ -62,6 +62,7 @@ for encoding in ENCODINGS
             model   = build_model(p; encoding=encoding, K=K_SCENARIOS)
             t_start = time()
             train_with_handler(model, handler;
+                encoding    = encoding,
                 iter_limit  = ITER_LIMIT,
                 time_limit  = TIME_LIMIT,
                 print_level = 0,

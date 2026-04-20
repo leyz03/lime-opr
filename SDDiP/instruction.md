@@ -636,7 +636,188 @@ end
 
 ---
 
-## 13. 参考
+## 13. 参数调整指南
+
+本节汇总所有可控参数，按层次从高到低排列。调参顺序建议：先确定问题规模，再调 SDDP 迭代预算，最后才动子问题求解器细节。
+
+---
+
+### 13.1 问题规模（`LinearScenarioConfig` in `run_experiment.jl`）
+
+这是最上层的控制，决定模型的绝对大小。
+
+```julia
+cfg = LinearScenarioConfig(
+    # ── 必填 ───────────────────────────────────────────────────
+    n_nodes       = 3,       # 站点数。变量/约束数 ∝ n³；n=4 时约是 n=3 的 2.4 倍
+    T             = 4,       # 阶段数。每多一阶段 = 再建一个子问题
+    total_bikes   = 12,      # 总车数。决定 B_max 和 pipeline 深度
+    total_workers = 6,       # 总工人数。决定 W_tot 和 G pipeline 深度
+
+    # ── 需求 ───────────────────────────────────────────────────
+    demand_level  = 0.6,     # 总需求 = total_bikes × demand_level（相对于车队规模）
+                             # 0.3=宽松, 0.6=均衡, 1.0=紧张
+    od_dirichlet_alpha = 1.0,# OD 分布集中度。1.0=均匀, <1=集中到少数 OD, >1=更分散
+
+    # ── 网络几何 ────────────────────────────────────────────────
+    d_base   = 1.0,          # 工人空驶时间基础值（整数化后影响 δ_ijk 和 pipeline 深度）
+    d_slope  = 0.10,         # 随距离增加速率。slope↑ → pipeline 更深 → 状态维度更大
+    c_base   = 1.0,          # 任务操作时间基础值
+    c_slope  = 0.10,
+    phi_base = 0.05,         # 车辆损坏概率基础值（影响 U pipeline）
+    phi_slope= 0.01,
+
+    # ── 经济参数 ────────────────────────────────────────────────
+    revenue_level = 20.0,    # 所有 OD 的统一收益 R_ij
+    penalty_Cp    = 50.0,    # 丢失需求惩罚。Cp/R 比值大 → 模型更倾向于满足需求
+    price_ub      = 100.0,   # 任务价格上界（同时是 Q2 Big-M）。不要随意缩小
+    p_jk_level    = 50.0,    # 所有 (j,k) 的固定任务价格
+)
+```
+
+**规模影响速查表**
+
+| 参数 | 对状态维度的影响 | 对子问题约束数的影响 |
+|---|---|---|
+| `n_nodes` ↑ 1 | ×(n+1/n)³ 近似 | ×(n+1/n)³ |
+| `T` ↑ 1 | 无（阶段独立） | 新增一个完整子问题 |
+| `d_slope` ↑ | G pipeline 更深，状态 ↑ | 约束 ↑ |
+| `total_bikes` ↑ | B_max ↑ → binary 位数 ↑ | 无直接影响 |
+
+---
+
+### 13.2 SAA 场景数（`run_experiment.jl`）
+
+```julia
+K_SCENARIOS = 20    # 每阶段的抽样场景数
+                    # 影响：后向传递每次迭代要解 K 个子问题
+                    # K↑ → 期望近似更准，但每次迭代更慢
+                    # 推荐：验证用 K=5, 正式实验 K=20~50
+
+N_SIM = 500         # 评估时的仿真路径数
+                    # 影响：仅在训练结束后的 evaluate_policy 里用
+                    # N_SIM↑ → CI 更窄，但评估时间线性增加
+                    # 推荐：N_SIM ≥ 200 才能得到可靠的 95% CI
+```
+
+---
+
+### 13.3 SDDP 迭代预算（`train_with_handler` in `src/train.jl`）
+
+控制整个训练循环何时停止。
+
+```julia
+train_with_handler(model, handler;
+    encoding    = :int,      # 传给 LD handler 选择 BFGS 或 OuterApproximation
+
+    # ── 硬停止条件（满足任一即停） ──────────────────────────────
+    iter_limit  = 100,       # 最大迭代次数
+    time_limit  = 600.0,     # 最大挂钟时间（秒）
+
+    # ── 软停止条件（BoundStalling） ─────────────────────────────
+    stall_iters = 20,        # 连续多少轮 bound 改善 < stall_tol 则停止
+    stall_tol   = 1e-4,      # 相对改善阈值（bound 改善 < tol × |bound| 算"停滞"）
+                             # 调大 stall_tol（如 1e-3）→ 更早停止，节省时间但可能欠拟合
+
+    # ── 日志 ────────────────────────────────────────────────────
+    print_level = 1,         # 0=静默, 1=每轮一行（bound/time）, 2=每轮详细
+)
+```
+
+**何时调哪个：**
+- 快速验证：`iter_limit=5, time_limit=60, K=5`
+- 正式跑但有时间限制：`time_limit=600, stall_iters=20`（让 bound 停滞自动停）
+- 追求最紧 bound：`iter_limit=500, stall_tol=1e-5`（严格停止标准）
+
+---
+
+### 13.4 子问题求解器（Gurobi）参数（`src/build_model.jl`）
+
+每个阶段 subproblem 是一个 MILP，由 Gurobi 求解。在 `build_model.jl` 的 `do sp, t` 块内设置：
+
+```julia
+) do sp, t
+    set_optimizer_attribute(sp, "OutputFlag",    0)      # 0=静默（必留）
+    set_optimizer_attribute(sp, "TimeLimit",     30.0)   # 每个子问题最多 30 秒
+    set_optimizer_attribute(sp, "MIPGap",        0.01)   # 子问题 1% gap 即可停止
+    set_optimizer_attribute(sp, "Threads",       4)      # 每个子问题用 4 线程
+    set_optimizer_attribute(sp, "NumericFocus",  1)      # 0=默认, 1~3=越来越注重数值精度
+```
+
+**关键权衡：**
+
+| 参数 | 放松（更快） | 收紧（更慢但更准） |
+|---|---|---|
+| `MIPGap` | 0.05（5%） | 1e-6（默认） |
+| `TimeLimit` | 10s | 无限制 |
+| `NumericFocus` | 0 | 3 |
+
+> **注意**：子问题 `MIPGap` 放松后，SDDP cut 的截距 α 可能偏松，导致 bound 收紧变慢。建议先保持默认（`MIPGap=1e-4`），只在子问题是瓶颈时才放松。
+
+---
+
+### 13.5 Lagrangian Duality 内层求解（`src/train.jl`）
+
+`:LD` handler 在每次后向传递里还需要额外解一个 Lagrangian 对偶问题。
+
+```julia
+# int 编码：用 BFGS（默认），适合低维（~20 个乘子）
+SDDP.LagrangianDuality()
+# 等价于：
+SDDP.LagrangianDuality(; method = SDDP.LocalImprovementSearch.BFGS(100))
+#                                                                   ^^^
+#                                                       最多 100 次函数评估（MIP 次数）
+#                                         增大 → 乘子收敛更准但每次后向更慢
+
+# bin 编码：用 OuterApproximation（切割平面法），避免高维 BFGS 矩阵病态
+SDDP.LagrangianDuality(;
+    method = SDDP.LocalImprovementSearch.OuterApproximation(
+        optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
+    ),
+)
+```
+
+**调整建议：**
+- `BFGS(50)` → 更快但乘子精度差，适合验证
+- `BFGS(200)` → 更准，适合追求 tight cut
+- `OuterApproximation` 没有显式迭代上限，收敛由内层 LP 的停止准则决定
+
+---
+
+### 13.6 编码与 handler 的组合建议
+
+根据实验结果（n=3, T=4, 100 iter, 600s 预算）：
+
+| 目标 | 推荐配置 |
+|---|---|
+| 最快得到合理 bound | `int + SCD`（~25s, gap≈46%） |
+| 最紧 bound（有限时间内） | `int + LD` 或 `int + Bandit`（~20s, gap≈35%） |
+| 理论有限收敛（时间充足） | `bin + LD`（需要远超 100 次迭代） |
+| 快速冒烟测试 | `int + CCD`（最快，但 gap≈87%） |
+
+---
+
+### 13.7 参数调整流程
+
+```
+1. 固定小规模（n=3, T=4, K=5, iter=5）验证模型正确性
+        ↓
+2. 增大 K（20→50）和 iter（20→100），观察 bound 收紧速度
+        ↓
+3. 如果子问题是瓶颈（每轮 > 10s）：
+   - 放宽 MIPGap（0.01）
+   - 减少 Threads（避免过度并行）
+        ↓
+4. 如果 bound 停滞但 gap 仍大：
+   - 切换 handler（CCD → SCD → Bandit）
+   - 增加 iter_limit，放宽 stall_tol
+        ↓
+5. 正式实验（n=4+, T=6, K=20, iter=200, nsim=500）
+```
+
+---
+
+## 14. 参考
 
 - Zou, Ahmed, Sun (2019) — SDDiP 定理与 Lagrangian cut。
 - Dowson, Kapelevich (2021) — SDDP.jl 包论文。

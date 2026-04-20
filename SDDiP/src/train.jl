@@ -12,7 +12,8 @@ All five produce valid cuts; only :LD on binary states gives the Zou et al.
 finite-convergence guarantee.
 """
 
-using SDDP
+using SDDP, Gurobi
+import JuMP: optimizer_with_attributes
 
 
 """
@@ -30,13 +31,14 @@ Keyword arguments (with defaults):
 function train_with_handler(
     model,
     handler_symbol::Symbol;
+    encoding    ::Symbol  = :int,
     iter_limit  ::Int     = 200,
     time_limit  ::Float64 = 3600.0,
     stall_iters ::Int     = 20,
     stall_tol   ::Float64 = 1e-4,
     print_level ::Int     = 1,
 )
-    handler = _make_handler(handler_symbol)
+    handler = _make_handler(handler_symbol; encoding = encoding)
 
     SDDP.train(
         model;
@@ -54,22 +56,36 @@ end
 # Internal: symbol → handler object
 # ─────────────────────────────────────────────────────────────────────────────
 
-function _make_handler(s::Symbol)
+function _make_handler(s::Symbol; encoding::Symbol = :int)
     if s == :CCD
         return SDDP.ContinuousConicDuality()
     elseif s == :SCD
         return SDDP.StrengthenedConicDuality()
     elseif s == :LD
-        return SDDP.LagrangianDuality()
+        return _make_ld(encoding)
     elseif s == :FDD
         return SDDP.FixedDiscreteDuality()
     elseif s == :Bandit
         return SDDP.BanditDuality(
             SDDP.ContinuousConicDuality(),
             SDDP.StrengthenedConicDuality(),
-            SDDP.LagrangianDuality(),
+            _make_ld(encoding),
         )
     else
         error("Unknown duality handler: $s. Choose from :CCD, :SCD, :LD, :FDD, :Bandit")
+    end
+end
+
+# BFGS for int (low-dim, fast convergence);
+# OuterApproximation for bin (high-dim, avoids ill-conditioned BFGS matrix).
+function _make_ld(encoding::Symbol)
+    if encoding == :bin
+        return SDDP.LagrangianDuality(;
+            method = SDDP.LocalImprovementSearch.OuterApproximation(
+                optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0),
+            ),
+        )
+    else
+        return SDDP.LagrangianDuality()  # default BFGS(100)
     end
 end
