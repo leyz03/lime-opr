@@ -517,35 +517,26 @@ $$
 
 ### 9.3 训练代码
 
-```julia
-function train_with_handler(model, handler_symbol::Symbol; kwargs...)
-    handler = if handler_symbol == :CCD
-        SDDP.ContinuousConicDuality()
-    elseif handler_symbol == :SCD
-        SDDP.StrengthenedConicDuality()
-    elseif handler_symbol == :LD
-        SDDP.LagrangianDuality()
-    elseif handler_symbol == :Bandit   # 混合
-        SDDP.BanditDuality(
-            SDDP.ContinuousConicDuality(),
-            SDDP.StrengthenedConicDuality(),
-            SDDP.LagrangianDuality(),
-        )
-    else
-        error("unknown handler $handler_symbol")
-    end
+完整接口（`src/train.jl`）：
 
-    SDDP.train(
-        model;
-        iteration_limit     = get(kwargs, :iter_limit, 200),
-        time_limit          = get(kwargs, :time_limit, 3600),
-        stopping_rules      = [SDDP.BoundStalling(20, 1e-4)],
-        duality_handler     = handler,
-        log_every_iteration = true,
-        print_level         = 1,
-    )
-end
+```julia
+train_with_handler(model, handler_symbol::Symbol;
+    encoding    = :int,    # :int 或 :bin，决定 LD 使用 BFGS 还是 OuterApproximation
+    iter_limit  = 200,     # 最大 SDDP 迭代次数
+    time_limit  = 3600.0,  # 最大挂钟时间（秒）
+    stall_iters = 20,      # BoundStalling 停止前的停滞轮数
+    stall_tol   = 1e-4,    # BoundStalling 相对改善阈值
+    print_level = 1,       # 0=静默, 1=每轮一行, 2=每轮详细（log_every_iteration）
+    oa_iters    = 20,      # OuterApproximation 内层切割平面迭代上限（bin+LD 专用）
+)
 ```
+
+**handler 与编码的对应关系**（`_make_ld` 内部自动选择）：
+
+| `encoding` | `:LD` 使用的内层方法 | 原因 |
+|---|---|---|
+| `:int` | `BFGS(100)` | 乘子维度低（~20），BFGS 快速收敛 |
+| `:bin` | `OuterApproximation(Gurobi, oa_iters)` | 乘子维度高（100+），BFGS 矩阵病态 → Inf/NaN |
 
 ### 9.4 混合 cut 的控制（回答你上条问题）
 
@@ -772,7 +763,8 @@ SDDP.LagrangianDuality(; method = SDDP.LocalImprovementSearch.BFGS(100))
 # bin 编码：用 OuterApproximation（切割平面法），避免高维 BFGS 矩阵病态
 SDDP.LagrangianDuality(;
     method = SDDP.LocalImprovementSearch.OuterApproximation(
-        optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0)
+        optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0),
+        50,    # oa_iters: 内层迭代上限（见下方 patch 说明）
     ),
 )
 ```
@@ -780,7 +772,59 @@ SDDP.LagrangianDuality(;
 **调整建议：**
 - `BFGS(50)` → 更快但乘子精度差，适合验证
 - `BFGS(200)` → 更准，适合追求 tight cut
-- `OuterApproximation` 没有显式迭代上限，收敛由内层 LP 的停止准则决定
+- `OuterApproximation` 内层迭代上限默认为 20（原始硬编码），已 patch 为可配参数（见下）
+
+**通过 `train_with_handler` 控制 `oa_iters`（推荐入口）：**
+
+```julia
+train_with_handler(model, :LD;
+    encoding  = :bin,
+    oa_iters  = 50,     # 内层 OuterApproximation 切割平面迭代上限，默认 20
+    iter_limit = 300,
+    time_limit = 3600.0,
+)
+```
+
+---
+
+#### SDDP.jl 源码 Patch — `OuterApproximation` 内层迭代上限
+
+**背景**：SDDP.jl v1.13+ 中 `OuterApproximation` 的内层迭代上限硬编码为 20（`evals[] < 20`），无法通过参数传入。
+
+**Patch 位置**：
+```
+~/.julia/packages/SDDP/<hash>/src/plugins/local_improvement_search.jl
+```
+
+**Patch 内容（两处修改）**：
+
+1. 给 `OuterApproximation` 结构体加字段，并保持默认构造器：
+```julia
+# 原始
+struct OuterApproximation{O} <: AbstractSearchMethod
+    optimizer::O
+end
+
+# Patch 后
+struct OuterApproximation{O} <: AbstractSearchMethod
+    optimizer::O
+    iteration_limit::Int
+end
+OuterApproximation(optimizer) = OuterApproximation(optimizer, 20)  # 保持原默认行为
+```
+
+2. 把 `while` 循环里的硬编码换成字段引用：
+```julia
+# 原始（第 178 行）
+while d_step > 1e-8 && evals[] < 20
+
+# Patch 后
+while d_step > 1e-8 && evals[] < method.iteration_limit
+```
+
+**回滚方法**：把上面两处改动还原即可——删除 `iteration_limit` 字段和默认构造器，把 `method.iteration_limit` 改回 `20`。Julia 下次 `using SDDP` 时会自动重新预编译。
+
+> ⚠️ **注意**：patch 的是 Julia 全局包缓存（`~/.julia/packages/`），不在本 repo 内。升级 SDDP.jl 包版本会覆盖此修改，需要重新 patch。
 
 ---
 

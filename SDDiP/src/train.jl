@@ -27,6 +27,7 @@ Keyword arguments (with defaults):
   stall_iters = 20          BoundStalling patience
   stall_tol   = 1e-4        BoundStalling relative tolerance
   print_level = 1           0 = silent, 1 = summary, 2 = per-iteration
+  oa_iters    = 20          OuterApproximation inner cutting-plane budget (bin+LD only)
 """
 function train_with_handler(
     model,
@@ -37,8 +38,9 @@ function train_with_handler(
     stall_iters ::Int     = 20,
     stall_tol   ::Float64 = 1e-4,
     print_level ::Int     = 1,
+    oa_iters    ::Int     = 20,
 )
-    handler = _make_handler(handler_symbol; encoding = encoding)
+    handler = _make_handler(handler_symbol; encoding = encoding, oa_iters = oa_iters)
 
     SDDP.train(
         model;
@@ -56,20 +58,20 @@ end
 # Internal: symbol → handler object
 # ─────────────────────────────────────────────────────────────────────────────
 
-function _make_handler(s::Symbol; encoding::Symbol = :int)
+function _make_handler(s::Symbol; encoding::Symbol = :int, oa_iters::Int = 20)
     if s == :CCD
         return SDDP.ContinuousConicDuality()
     elseif s == :SCD
         return SDDP.StrengthenedConicDuality()
     elseif s == :LD
-        return _make_ld(encoding)
+        return _make_ld(encoding; oa_iters = oa_iters)
     elseif s == :FDD
         return SDDP.FixedDiscreteDuality()
     elseif s == :Bandit
         return SDDP.BanditDuality(
             SDDP.ContinuousConicDuality(),
             SDDP.StrengthenedConicDuality(),
-            _make_ld(encoding),
+            _make_ld(encoding; oa_iters = oa_iters),
         )
     else
         error("Unknown duality handler: $s. Choose from :CCD, :SCD, :LD, :FDD, :Bandit")
@@ -78,11 +80,13 @@ end
 
 # BFGS for int (low-dim, fast convergence);
 # OuterApproximation for bin (high-dim, avoids ill-conditioned BFGS matrix).
-function _make_ld(encoding::Symbol)
+# oa_iters controls inner cutting-plane budget (default 20, patched to accept parameter).
+function _make_ld(encoding::Symbol; oa_iters::Int = 20)
     if encoding == :bin
         return SDDP.LagrangianDuality(;
             method = SDDP.LocalImprovementSearch.OuterApproximation(
                 optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0),
+                oa_iters,
             ),
         )
     else

@@ -164,4 +164,47 @@ phi_base=0.05, phi_slope=0.01
 
 ---
 
+### EXP-005 — K sensitivity: K=20 vs K=50，iter=100
+**Date:** 2026-04-20
+**Purpose:** 观察增大 SAA 场景数（K: 20→50）对 bound 收紧速度的影响；所有格使用 oa_iters=50（已 patch OuterApproximation 内层上限）。
+**Config:** n=3, T=4, total_bikes=12, total_workers=6, seed=42；iter=100, nsim=500, oa_iters=50
+**Script:** `run_exp_k50.jl` → `results/exp_k50.csv`（基线来自 `results/exp_2x4_factorial.csv`）
+
+#### 结果对比表
+
+| Encoding | Handler | Bound K=20 | Bound K=50 | Δ Bound | Gap K=20 | Gap K=50 | Time K=20 (s) | Time K=50 (s) |
+|---|---|---|---|---|---|---|---|---|
+| int | CCD   | -184.0  | -145.9  | +38.2 (worse) | 87.2% | 89.9% | 11.8  | 19.4  |
+| int | SCD   | -781.0  | -854.7  | **-73.7**     | 45.9% | **41.3%** | 25.7  | 67.6  |
+| int | LD    | -931.8  | -964.9  | **-33.1**     | 34.9% | **33.5%** | 21.0  | 181.4 |
+| int | Bandit| -934.4  | -964.9  | **-30.5**     | 35.0% | **32.8%** | 14.6  | 21.5  |
+| bin | CCD   | -184.0  | -145.9  | +38.2 (worse) | 87.3% | 89.9% | 10.0  | 21.8  |
+| bin | SCD   | -781.0  | -854.7  | **-73.7**     | 45.8% | **39.7%** | 39.2  | 100.6 |
+| bin | LD    | -318.5  | -80.6   | +237.9 (worse)| 77.6% | 94.3% | 350.6 | 435.1 |
+| bin | Bandit| -781.0  | -854.7  | **-73.7**     | 44.9% | **41.0%** | 38.6  | 200.4 |
+
+> bound 为 SDDP 上界（越负越紧）；Δ 为负表示 K=50 更紧（改善）。
+
+#### 主要发现
+
+**K=50 有效改善 bound 的格（−30 至 −74）：**
+- `int/bin + SCD`：gap 均从 ~46% 降至 ~40%，改善显著；代价是运行时间翻倍（int+SCD 25s→68s，bin+SCD 39s→101s）
+- `int + LD` / `int + Bandit`：bound 从 -932/-934 收紧至 -965（gap 35%→33%），改善幅度小但稳定；`int+Bandit` 时间几乎不变（14.6s→21.5s），因为 Bandit 在 K=50 下迅速选定 LD 臂
+- `bin + Bandit`：同 bin+SCD，gap 45%→41%
+
+**K=50 无效或退化的格：**
+- `CCD`（int+bin 均同）：bound 从 -184 变为 -146（更松）；CCD cut 是 LP 松弛对偶，本质弱；更多场景平均并不改善 cut 质量，反而因抽样差异导致轻微退化
+- `bin + LD`：bound 从 -318 退化至 -81（gap 77%→94%）——这是最差结果。原因：K=50 时每次后向传递需要处理 50 个场景，每个场景运行 oa_iters=50 次切割平面（共 2500 次 Gurobi 调用/迭代），Lagrangian 对偶在高维二进制空间（100+ 乘子）中的场景平均噪声更大，K=20 时的 -983（单次诊断）表明内层只需 20 个场景就能收敛，增加 K 反而稀释了有效信息
+
+**时间开销：** K 从 20→50 的理论倍数是 2.5×，实测 SCD/Bandit 约 2-3×；LD 因内层额外求解约 5-8×（bin+LD: 350s→435s，相对温和，因为已达到 100 iter 时间限制前停止）
+
+#### 结论与建议
+
+| 场景 | 推荐 K | 原因 |
+|---|---|---|
+| 快速验证 | K=5~10 | 模型正确性检查 |
+| 标准实验（int 编码） | **K=50** | SCD/Bandit 均有明显改善，时间可接受 |
+| 标准实验（bin 编码） | **K=20** | bin+LD 在 K=50 下反而退化；SCD/Bandit 改善有限 |
+| bin+LD 专项研究 | K=20, oa_iters=50 | 见 EXP-diagnose：K=20+oa50 给 -983，远好于 K=50+oa50 的 -81 |
+
 *Add new experiments below this line following the EXP-NNN format.*

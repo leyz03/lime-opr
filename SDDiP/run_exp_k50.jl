@@ -1,22 +1,13 @@
 """
-run_experiment.jl  —  2×4 factorial experiment: encoding × duality handler
+run_exp_k50.jl  —  K=50 sensitivity experiment (vs baseline K=20)
 
-Factors:
-  encoding : :int  (integer SDDP.State)
-             :bin  (binary-expanded SDDP.State)
-  handler  : :CCD  (ContinuousConicDuality)
-             :SCD  (StrengthenedConicDuality)
-             :LD   (LagrangianDuality)
-             :Bandit (BanditDuality over CCD+SCD+LD)
+Purpose: observe bound tightening speed when K increases from 20 to 50,
+         with oa_iters=50 fix applied for bin+LD.
 
-Outputs:
-  - progress printed per cell
-  - summary 2×4 table to stdout
-  - results written to results/exp_2x4_factorial.csv
+Config: same instance as baseline (n=3, T=4, seed=42)
+        K=50, iter=100, nsim=500, oa_iters=50
 
-Usage:
-  julia --project=. run_experiment.jl
-  julia --project=. run_experiment.jl --smoke   # quick 3-iter smoke test
+Output: results/exp_k50.csv
 """
 
 include("src/build_model.jl")
@@ -24,9 +15,6 @@ include("src/train.jl")
 include("src/simulate.jl")
 
 using CSV, DataFrames
-
-# ─── Configuration ────────────────────────────────────────────────────────────
-SMOKE = "--smoke" in ARGS   # quick test mode
 
 cfg = LinearScenarioConfig(
     n_nodes       = 3,
@@ -36,21 +24,19 @@ cfg = LinearScenarioConfig(
 )
 p = build_params(cfg; seed=42)
 
-ENCODINGS = [:int, :bin]
-HANDLERS  = [:CCD, :SCD, :LD, :Bandit]
-
-ITER_LIMIT  = SMOKE ? 3   : 100
-TIME_LIMIT  = SMOKE ? 60.0 : 600.0
-K_SCENARIOS = SMOKE ? 5   : 20
-N_SIM       = SMOKE ? 20  : 500
+ENCODINGS   = [:int, :bin]
+HANDLERS    = [:CCD, :SCD, :LD, :Bandit]
+ITER_LIMIT  = 100
+TIME_LIMIT  = 1200.0   # 20 min per cell (K=50 is slower)
+K_SCENARIOS = 50
+N_SIM       = 500
+OA_ITERS    = 50
 
 println("=" ^ 60)
-println("2×4 SDDiP Factorial Experiment")
-println("n=$(length(p.N)), T=$(p.T), K=$K_SCENARIOS, iter_limit=$ITER_LIMIT")
-SMOKE && println("  [SMOKE MODE — reduced iterations]")
+println("SDDiP K=50 Sensitivity Experiment")
+println("n=$(length(p.N)), T=$(p.T), K=$K_SCENARIOS, iter_limit=$ITER_LIMIT, oa_iters=$OA_ITERS")
 println("=" ^ 60)
 
-# ─── Run cells ────────────────────────────────────────────────────────────────
 rows = []
 
 for encoding in ENCODINGS
@@ -66,7 +52,7 @@ for encoding in ENCODINGS
                 iter_limit  = ITER_LIMIT,
                 time_limit  = TIME_LIMIT,
                 print_level = 0,
-                oa_iters    = 50,    # bin+LD: 20 causes zero bound improvement; 50 converges
+                oa_iters    = OA_ITERS,
             )
             runtime = time() - t_start
             metrics = evaluate_policy(model, p; nsim=N_SIM)
@@ -102,31 +88,28 @@ for encoding in ENCODINGS
     end
 end
 
-# ─── Summary table ────────────────────────────────────────────────────────────
 println("\n" * "=" ^ 60)
-println("RESULTS SUMMARY")
+println("RESULTS SUMMARY  (K=50 vs K=20 baseline)")
 println("=" ^ 60)
 header = rpad("Encoding", 8) * rpad("Handler", 10) *
-         rpad("Bound", 10)   * rpad("μ ± ci", 20)  *
+         rpad("Bound", 12)   * rpad("μ ± ci", 22)  *
          rpad("Gap%", 8)     * "Time(s)"
 println(header)
-println("-" ^ 60)
+println("-" ^ 65)
 for r in rows
     ci_str = "$(round(r.mu; digits=1)) ± $(round(r.ci; digits=1))"
     println(
         rpad(r.encoding,  8) *
         rpad(r.handler,  10) *
-        rpad(round(r.bound;     digits=2), 10) *
-        rpad(ci_str,             20) *
+        rpad(round(r.bound;     digits=2), 12) *
+        rpad(ci_str,             22) *
         rpad(round(r.gap_pct;   digits=1), 8) *
         string(round(r.runtime_s; digits=1))
     )
 end
-println("=" ^ 60)
+println("=" ^ 65)
 
-# ─── Save CSV ─────────────────────────────────────────────────────────────────
 mkpath("results")
 df = DataFrame(rows)
-out_path = SMOKE ? "results/exp_2x4_smoke.csv" : "results/exp_2x4_factorial.csv"
-CSV.write(out_path, df)
-println("\nResults saved to $out_path")
+CSV.write("results/exp_k50.csv", df)
+println("\nResults saved to results/exp_k50.csv")
