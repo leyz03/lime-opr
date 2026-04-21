@@ -42,10 +42,12 @@
 - smoke test（n=3, T=2, 5 iter, 50 sim）：int 编码 gap=60%，bin 编码 gap=60%，recorders 误差 < 1e-4 ✓
 
 ### Step 9 — `src/train.jl` ✅
-- `train_with_handler(model, handler_symbol; iter_limit, time_limit, stall_iters, stall_tol, print_level)`
+- `train_with_handler(model, handler_symbol; iter_limit, time_limit, stall_iters, stall_tol, print_level, oa_iters)`
 - 支持 5 种 handler：`:CCD` / `:SCD` / `:LD` / `:FDD` / `:Bandit`
 - `BanditDuality` 包含 CCD+SCD+LD 三臂，自适应选择
 - `BoundStalling(stall_iters, stall_tol)` 作为停止规则（默认 20 轮无改善 1e-4）
+- **编码感知 LD**：`int` 编码用 `BFGS(100)`（低维快速）；`bin` 编码用 `OuterApproximation(Gurobi, oa_iters)`（避免高维 BFGS 矩阵病态）
+- **`oa_iters` kwarg**（2026-04-20 新增，EXP-004b 后）：控制 bin+LD 内层切割平面迭代上限，默认 20；需配合 SDDP.jl 源码 patch 才生效（见 EXP-004b）
 - smoke test（n=3, T=2, K=3, 3 iterations）：5 种 handler 均无错；CCD/SCD/LD/Bandit 均从 4003 降至约 -300；FDD 整数编码下需更多迭代才能收紧（已标注，非 bug）
 
 ### Step 8 — `src/build_model.jl` ✅
@@ -161,6 +163,82 @@ phi_base=0.05, phi_slope=0.01
 | ContinuousConicDuality | — | — | — |
 | LagrangianDuality | — | — | — |
 | BanditDuality | — | — | — |
+
+---
+
+### EXP-004b — bin+LD bound 停滞诊断 & OuterApproximation patch
+**Date:** 2026-04-20
+**Purpose:** 诊断 bin+LD 在基线实验（K=20, iter=100）中 bound 卡在 -318、全程零改善的原因；找到修复方法。
+**Script:** `diagnose_bin_ld.jl`（`print_level=2`，每次迭代打印 bound）
+
+#### 诊断过程
+
+**Step 1 — 打开逐迭代日志（oa_iters=20，默认）**
+
+运行 `julia --project=. diagnose_bin_ld.jl`，50次迭代输出：
+
+```
+iter  simulation    bound          time(s)
+  1L  -1300.0   -3.184605e+02    8.3
+  2L  -1400.0   -3.184605e+02   11.4
+  ...
+ 50L  -1550.0   -3.184605e+02  180.9
+```
+
+→ bound 全程固定在 -318，**50次迭代零改善**。符合"每次 LD 只跑了几个外近似切，远未收敛"模式。
+
+**Step 2 — 定位根因**
+
+查阅 SDDP.jl 源码：
+```
+~/.julia/packages/SDDP/ScjyB/src/plugins/local_improvement_search.jl
+```
+发现 `OuterApproximation` 内层迭代上限**硬编码**为 20（`evals[] < 20`），无法通过参数传入。20 次切割平面迭代对于 100+ 维二进制 Lagrange 乘子空间不足以收敛，每次产生的 cut 过松，无法收紧 SDDP 外层 bound。
+
+**Step 3 — Patch SDDP.jl 源文件**
+
+两处修改（`local_improvement_search.jl`）：
+
+```julia
+# 1. 给结构体加字段，保留默认构造器
+struct OuterApproximation{O} <: AbstractSearchMethod
+    optimizer::O
+    iteration_limit::Int          # 新增
+end
+OuterApproximation(optimizer) = OuterApproximation(optimizer, 20)  # 默认兼容
+
+# 2. while 循环使用字段（原为硬编码 20）
+while d_step > 1e-8 && evals[] < method.iteration_limit
+```
+
+同步在 `src/train.jl` 的 `train_with_handler` 暴露 `oa_iters` kwarg（默认 20，向后兼容）。
+
+**Step 4 — 验证修复效果（oa_iters=50）**
+
+运行 `julia --project=. diagnose_bin_ld.jl --oa 50`：
+
+```
+iter  simulation    bound          time(s)
+  1L  -1400.0    4.099974e+00    9.4
+  2L  -1050.0    7.786817e+02   13.5
+  3L  -1800.0   -9.830000e+02   17.1
+  4L  -1500.0   -9.830000e+02   19.0
+  ...
+ 50L  -1350.0   -9.830000e+02  114.4
+```
+
+→ bound 在 iter 3 收敛至 **-983**（vs oa_iters=20 的 -318），改善 3×。
+
+**iter 3 后 bound 再度停滞**：说明外层 SDDP 迭代积累的 cut 多样性不足，需要更多外层迭代（非内层问题）。
+
+#### 结论
+
+| 参数 | bound（50 iter） | 说明 |
+|---|---|---|
+| oa_iters=20（默认） | -318，**零改善** | 内层不收敛，cut 极松 |
+| oa_iters=50（patch 后）| **-983**，iter 3 收敛 | 内层收敛，cut 有效 |
+
+**遗留问题：** iter 3 后 bound 完全停滞（warm-start 退化 or cut 多样性不足），需要更大 iter 预算才能继续收紧。
 
 ---
 
