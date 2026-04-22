@@ -285,6 +285,82 @@ iter  simulation    bound          time(s)
 | 标准实验（bin 编码） | **K=20** | bin+LD 在 K=50 下反而退化；SCD/Bandit 改善有限 |
 | bin+LD 专项研究 | K=20, oa_iters=50 | 见 EXP-diagnose：K=20+oa50 给 -983，远好于 K=50+oa50 的 -81 |
 
+### EXP-006 — bin+LD 长跑测试：更大 iter 预算是否继续收紧？
+**Date:** 2026-04-21
+**Purpose:** 验证 bin+LD bound 在 iter=3 后停滞是"预算不足"还是"cut 多样性不足"。
+**Config:** n=3, T=4, K=20, oa_iters=50, iter_limit=300, time_limit=Inf, stall_iters=30
+**Script:** `diagnose_bin_ld.jl`（无时间限制版）
+
+#### 结果
+
+```
+iter 1:  bound = +4.1    (OA 未收敛，截距为正)
+iter 2:  bound = +778    (OA 仍未稳定)
+iter 3:  bound = -983    ← 第一次有效 cut，bound 正确落地
+iter 4~33: bound = -983  完全不动
+termination: bound_stalling（30 轮无改善），最终 bound = -983
+```
+
+**结论：增大迭代预算无效。** bound 在 iter=3 后完全冻结，30 次额外迭代没有任何改善，BoundStalling 触发退出。即使给 300 次迭代，同样在 33 次内停止。
+
+#### 根本原因分析
+
+每次外层 SDDP 前向轨迹高度相似（binary 状态空间确定性强），后向 LD 的出发点 $x_t^*$ 几乎不变，Lagrangian 对偶反复收敛到同一个 $\lambda^*$，产生线性相关的 cut，bound 无新信息可收紧。
+
+**问题不在迭代次数，在 cut 多样性。**
+
+#### 后续方向
+
+| 方向 | 预期效果 | 风险 |
+|---|---|---|
+| K=50 + 无时间限制（下一个实验） | 更多样的前向轨迹 → cut 多样性↑ | EXP-005 显示 K=50 对 bin+LD 退化 |
+| 换 `bin + SCD` 或 `bin + Bandit` | bound 虽松但能持续收紧 | 失去 Lagrangian cut 的理论保证 |
+| 增大问题规模（n=4, T=6） | 状态空间更大，轨迹多样性↑ | 计算成本大幅上升 |
+
+### EXP-007 — bin+LD K=50 无时间限制长跑
+**Date:** 2026-04-21
+**Purpose:** 验证 K=50 + 更大迭代预算是否能改善 bin+LD 的停滞问题（接续 EXP-006）。
+**Config:** n=3, T=4, K=50, oa_iters=50, iter_limit=300, time_limit=Inf, stall_iters=30
+
+#### 结果
+
+```
+iter 1:  bound = +418.7  (OA 未收敛)
+iter 2:  bound = -54.5   (首次负值但较松)
+iter 3:  bound = -80.6   ← 收敛后停滞
+iter 4~33: bound = -80.6  完全不动
+termination: bound_stalling（30 轮），最终 bound = -80.6，耗时 ~628s
+```
+
+#### 与 EXP-006（K=20）对比
+
+| | K=20 | K=50 |
+|---|---|---|
+| 最终 bound | **-983** | -80.6 |
+| 停滞起始 iter | 3 | 3 |
+| 每轮耗时 | ~2.3s | ~19s（8×慢） |
+| 总耗时 | ~75s | ~628s |
+
+**K=50 比 K=20 差 12×**（bound -81 vs -983），且耗时 8× 更长。
+
+#### 结论
+
+增大 K 或迭代次数对 bin+LD **均无效**。问题根源已确认：
+
+> **Lagrangian cut 的场景平均机制在 K 增大时反而引入更多噪声**，使 cut 截距偏松。K=20 时 Lagrangian 对偶对少量场景能精确收敛；K=50 时 50 个场景的平均 $\lambda^*$ 分散，cut 质量下降。
+
+#### 总结：bin+LD 的实用限制
+
+| 参数组合 | bound | 评价 |
+|---|---|---|
+| K=20, oa_iters=20（原始默认）| -318，零改善 | 内层不收敛 |
+| K=20, oa_iters=50（patch 后）| **-983**，iter=3 收敛 | 目前最优 |
+| K=50, oa_iters=50 | -81，iter=3 收敛后停滞 | K 过大引入噪声 |
+| K=20, iter=300, 无时限 | -983，iter=33 停止 | 迭代预算无法突破停滞 |
+
+**当前 bin+LD 最优配置**：K=20, oa_iters=50，bound=-983，耗时~75s/33iter。
+后续若要进一步收紧，需要改变 cut 多样性的产生机制（如 noise injection 或 exploration 策略），而非调整现有参数。
+
 *Add new experiments below this line following the EXP-NNN format.*
 
 ---
