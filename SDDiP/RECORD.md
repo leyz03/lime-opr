@@ -415,6 +415,67 @@ termination: bound_stalling（30 轮），最终 bound = -80.6，耗时 ~628s
 > **所有 handler 的 bound 在 50 次以内的迭代中已完全收敛，增大迭代预算无任何帮助。**
 > 瓶颈不是迭代数量，而是 cut 本身的质量上限和多样性上限。
 
+### EXP-009 — Extensive Form (EF) 求解：SAA 真实最优值
+**Date:** 2026-04-21
+**Purpose:** 用 `SDDP.deterministic_equivalent` 求解相同 SAA 问题的精确最优，作为 SDDP 近似质量的基准。
+**Script:** `run_ef.jl` → `SDDP.deterministic_equivalent` + Gurobi
+
+#### 场景树说明
+
+我们**没有显式定义 scenario tree**，而是 stage-wise independent SAA：每阶段独立采 K 个场景。`deterministic_equivalent` 自动枚举 K^T 条等权路径：
+
+| K | T | 路径数 K^T | 可行性 |
+|---|---|---|---|
+| 3 | 4 | 81 | 极快 |
+| **5** | 4 | **625** | **快（本实验）** |
+| 10 | 4 | 10,000 | 慢（数十分钟） |
+| 20 | 4 | 160,000 | 不可行 |
+
+#### EF 求解结果（K=5, seed=42）
+
+```
+EF MIP 规模：240,240 变量，260,105 约束
+Presolve 后：10,604 变量，12,311 约束
+求解时间：1.1s（Gurobi，MIP gap=0%）
+EF 最优值：-1080.0  ← K=5 SAA 问题的精确最优
+```
+
+#### 与 SDDP 结果对比
+
+> ⚠️ **注意**：EF（K=5）和 SDDP（K=20）用的是不同场景集，不能直接相减计算"SDDP 近似误差"。正确的对比关系如下：
+
+```
+SDDP 上界（K=20）:  -931 ~ -998    ← 对真实最优的上界（越负越紧）
+EF 最优（K=5）:     -1080          ← K=5 SAA 问题的精确最优（下界的参考）
+SDDP 仿真 μ（K=20）: -1430 ~ -1450 ← SDDP 策略在新样本上的期望值（下界）
+```
+
+理论关系（maximization）：
+
+```
+仿真 μ ≤ 真实最优 ≤ SDDP bound
+         ≈ EF(K→∞)
+```
+
+- **EF(K=5) = -1080** 落在 SDDP bound（-998）和仿真 μ（-1440）之间，符合预期。
+- EF(K=5) 比 SDDP 仿真好（-1080 > -1440）是因为 EF 对固定的 5 个场景过拟合（in-sample optimal）。
+- SDDP bound（-998）比 EF(K=5) 更紧（-998 > -1080）说明 SDDP 上界在这组场景下仍偏松。
+
+#### 若需精确对比
+
+需对同一 K 同时跑 EF 和 SDDP：
+
+```julia
+# K=5，相同场景集（seed=42）
+model_ef   = build_model(p; encoding=:int, K=5)
+ef = SDDP.deterministic_equivalent(model_ef, Gurobi.Optimizer)   # → -1080
+
+model_sddp = build_model(p; encoding=:int, K=5)
+train_with_handler(model_sddp, :LD; encoding=:int, iter_limit=100)
+evaluate_policy(model_sddp, p; nsim=500)    # → bound + simulation μ
+# gap_vs_EF = (sddp_bound - ef_optimal) / |ef_optimal| × 100
+```
+
 *Add new experiments below this line following the EXP-NNN format.*
 
 ---
