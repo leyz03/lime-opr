@@ -286,3 +286,33 @@ iter  simulation    bound          time(s)
 | bin+LD 专项研究 | K=20, oa_iters=50 | 见 EXP-diagnose：K=20+oa50 给 -983，远好于 K=50+oa50 的 -81 |
 
 *Add new experiments below this line following the EXP-NNN format.*
+
+---
+
+## 当前最优配置建议
+
+基于 EXP-003（K=20 基线）、EXP-004b（bin+LD patch）、EXP-005（K=50 灵敏度）汇总。
+实例规模：n=3, T=4, total_bikes=12, total_workers=6, seed=42。
+
+### 按目标选配置
+
+| 目标 | 推荐配置 | bound | gap | 耗时 |
+|---|---|---|---|---|
+| 快速冒烟验证 | `int + CCD`, K=5, iter=5 | -184 | 87% | <5s |
+| 平衡速度与质量 | `int + SCD`, K=50, iter=100 | -855 | 41% | 68s |
+| 最紧 bound（有限预算） | `int + Bandit`, K=50, iter=100 | -965 | 33% | 22s |
+| 理论最强 cut（bin+LD） | `bin + LD`, K=20, oa_iters=50, iter=50+ | -983 | ~32% | ~115s/50iter |
+
+### K 的选择
+
+| 编码 | 推荐 K | 原因 |
+|---|---|---|
+| int | **K=50** | SCD/Bandit 均有明显改善（gap -5pp），时间 2-3× |
+| bin | **K=20** | bin+LD 在 K=50 下退化（-318→-81）；SCD/Bandit 改善有限 |
+
+### oa_iters 的选择（bin+LD 专属）
+
+| oa_iters | bin+LD bound（50 iter） | 说明 |
+|---|---|---|
+| 20（原默认） | -318，零改善 | 内层不收敛 |
+| **50（推荐）** | **-983**，iter 3 收敛 | 需先 patch SDDP.jl（见 EXP-004b） |

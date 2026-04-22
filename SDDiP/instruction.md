@@ -538,11 +538,11 @@ train_with_handler(model, handler_symbol::Symbol;
 | `:int` | `BFGS(100)` | 乘子维度低（~20），BFGS 快速收敛 |
 | `:bin` | `OuterApproximation(Gurobi, oa_iters)` | 乘子维度高（100+），BFGS 矩阵病态 → Inf/NaN |
 
-### 9.4 混合 cut 的控制（回答你上条问题）
+### 9.4 混合 cut 的控制
 
 - **跨迭代混合**是 `BanditDuality` 自动做的：它把"选哪种 cut"建模成多臂老虎机，每个臂的奖励 $= \Delta\text{bound} / \Delta t$，早期探索、后期开发。
 - **节点内混合**（同一次后向在不同 subproblem 用不同 cut）SDDP.jl **不原生支持**。如果要做，需要 fork 源码。
-- **状态编码和 cut 类型是正交的**：你可以在 `states_int.jl` 上跑 `LagrangianDuality`（cut 仍 valid，但不是 tight），也可以在 `states_bin.jl` 上跑 `ContinuousConicDuality`（cut valid, tight 不一定）。这是你论文实验的 2×N 析因设计。
+- **状态编码和 cut 类型是正交的**：可以在 `states_int.jl` 上跑 `LagrangianDuality`（cut valid 但不 tight），也可以在 `states_bin.jl` 上跑 `ContinuousConicDuality`（cut valid，tight 不保证）。
 
 ---
 
@@ -610,7 +610,7 @@ for encoding in (:int, :bin)
 end
 ```
 
-最终生成一张 2×4 表格（encoding × handler），列出 bound、simulation μ±ci、gap%、wall time。这是论文"SDDiP 实验"一节的核心内容。
+最终生成一张 2×4 表格（encoding × handler），列出 bound、simulation μ±ci、gap%、wall time。实验结果与配置建议见 `RECORD.md`。
 
 ---
 
@@ -830,14 +830,16 @@ while d_step > 1e-8 && evals[] < method.iteration_limit
 
 ### 13.6 编码与 handler 的组合建议
 
-根据实验结果（n=3, T=4, 100 iter, 600s 预算）：
+各 handler 性质概述：
 
-| 目标 | 推荐配置 |
-|---|---|
-| 最快得到合理 bound | `int + SCD`（~25s, gap≈46%） |
-| 最紧 bound（有限时间内） | `int + LD` 或 `int + Bandit`（~20s, gap≈35%） |
-| 理论有限收敛（时间充足） | `bin + LD`（需要远超 100 次迭代） |
-| 快速冒烟测试 | `int + CCD`（最快，但 gap≈87%） |
+| Handler | Cut 质量 | 每次迭代开销 | 适用场景 |
+|---|---|---|---|
+| `CCD` | 弱（LP 松弛对偶，启发性） | 最低（1 LP） | 快速冒烟、验证管道 |
+| `SCD` | 中（CCD + MIP 收紧截距） | 中（1 LP + 1 MIP） | 平衡速度与质量的首选 |
+| `LD` | 强（Lagrangian 对偶，tight for bin） | 高（多次 MIP bundle） | int 编码首选；bin 编码需 patch |
+| `Bandit` | 自适应（多臂选最优臂） | 变 | 不确定时的安全选择 |
+
+具体实验数值与配置推荐（K=20 vs K=50 对比、bin+LD patch 效果等）见 `RECORD.md § EXP-003 / EXP-004b / EXP-005`。
 
 ---
 
