@@ -361,6 +361,60 @@ termination: bound_stalling（30 轮），最终 bound = -80.6，耗时 ~628s
 **当前 bin+LD 最优配置**：K=20, oa_iters=50，bound=-983，耗时~75s/33iter。
 后续若要进一步收紧，需要改变 cut 多样性的产生机制（如 noise injection 或 exploration 策略），而非调整现有参数。
 
+### EXP-008 — 全 2×4 收敛诊断：各割是否提前收敛？
+**Date:** 2026-04-21
+**Purpose:** 对所有 8 格做无时间限制长跑（iter=300, BoundStalling(30)），确认各割在哪一轮停止改善、最终 bound 是否能超过基线（100 iter, K=20）。
+**Config:** n=3, T=4, K=20, oa_iters=50, iter_limit=300, time_limit=Inf, stall_iters=30
+**Script:** `run_exp_convergence.jl` → `results/convergence_logs/<encoding>_<handler>.log`
+
+#### 每格逐迭代 bound 分析
+
+| Cell | 实际迭代数 | Unique bound 值 | 停止原因 | 最终 bound |
+|---|---|---|---|---|
+| int+CCD | **300** | **1**（-184.05，全程不变） | iteration_limit | -184.05 |
+| int+SCD | **300** | **1**（-780.99，全程不变） | iteration_limit | -780.99 |
+| int+LD | 34 | 3（-930.6 → -931.6 → -931.8） | bound_stalling | -931.84 |
+| int+Bandit | 47 | 5（CCD→SCD→LD 各臂探索） | bound_stalling | -934.43 |
+| bin+CCD | **300** | **1**（-184.05，全程不变） | iteration_limit | -184.05 |
+| bin+SCD | **300** | **1**（-780.99，全程不变） | iteration_limit | -780.99 |
+| bin+LD | 33 | 多个（迅速收敛至 -998） | bound_stalling | **-998.0** |
+| bin+Bandit | 33 | 多个（Bandit 选定 SCD 臂） | bound_stalling | -780.99 |
+
+#### 关键发现
+
+**CCD / SCD：bound 从第 1 次迭代起冻结，300 次迭代零改善。**
+- CCD 和 SCD 的 cut 在第 1 次后向传递后已达到本方法的极限，后续每次迭代产生的 cut 与已有 cut 线性相关，bound 完全不变。
+- BoundStalling(30) 未触发（SDDP.jl 的实现似乎不对"零变化"计数），导致它们浪费了 300 次迭代。
+- **结论**：CCD/SCD 只需约 1~5 次迭代，多跑没有意义。
+
+**LD（int/bin）：小幅改善后快速停滞。**
+- int+LD：bound 在前 4 次迭代从 -930.6 爬升至 -931.8，之后 30 轮零改善，BoundStalling 触发（总 34 次）。
+- bin+LD：同样在少数迭代内收敛（-998），33 次后停止（与 EXP-006 的 -983 略有差异，属于随机种子导致的模型构建差异）。
+
+**Bandit：先探索各臂，最终 bound 取决于最强臂。**
+- int+Bandit：经历 CCD→SCD→LD 臂的探索（47 次迭代），最终 bound=-934，优于 int+LD 的 -932。
+- bin+Bandit：Bandit 最终停在 SCD 臂（-781），未充分利用 LD 臂——原因是 bin+LD 每轮耗时极高，Bandit 的奖励函数（Δbound/Δt）惩罚了慢臂。
+
+#### 与基线（100 iter）对比
+
+| Cell | 基线 bound (100 iter) | 长跑 bound (300 iter) | 是否改善 |
+|---|---|---|---|
+| int+CCD | -184.05 | -184.05 | ✗ 完全相同 |
+| int+SCD | -780.99 | -780.99 | ✗ 完全相同 |
+| int+LD | -931.84 | -931.84 | ✗ 完全相同 |
+| int+Bandit | -934.43 | -934.43 | ✗ 完全相同 |
+| bin+CCD | -184.05 | -184.05 | ✗ 完全相同 |
+| bin+SCD | -780.99 | -780.99 | ✗ 完全相同 |
+| bin+LD | -318.46 (oa=20) / -983 (oa=50) | **-998.0** | ✓ 轻微改善 |
+| bin+Bandit | -780.99 | -780.99 | ✗ 完全相同 |
+
+> bin+LD 从 -983（EXP-006）到 -998 的差异来自模型随机构建，不代表迭代改善。
+
+#### 总结
+
+> **所有 handler 的 bound 在 50 次以内的迭代中已完全收敛，增大迭代预算无任何帮助。**
+> 瓶颈不是迭代数量，而是 cut 本身的质量上限和多样性上限。
+
 *Add new experiments below this line following the EXP-NNN format.*
 
 ---

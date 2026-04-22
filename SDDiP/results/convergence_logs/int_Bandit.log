@@ -1,0 +1,120 @@
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+-------------------------------------------------------------------
+         SDDP.jl (c) Oscar Dowson and contributors, 2017-25
+-------------------------------------------------------------------
+problem
+  nodes           : 4
+  state variables : 83
+  scenarios       : 1.60000e+05
+  existing cuts   : false
+options
+  solver          : serial mode
+  risk measure    : SDDP.Expectation()
+  sampling scheme : SDDP.InSampleMonteCarlo
+subproblem structure
+  VariableRef                             : [308, 308]
+  AffExpr in MOI.EqualTo{Float64}         : [110, 110]
+  AffExpr in MOI.GreaterThan{Float64}     : [57, 57]
+  AffExpr in MOI.LessThan{Float64}        : [84, 84]
+  VariableRef in MOI.GreaterThan{Float64} : [164, 165]
+  VariableRef in MOI.Integer              : [119, 119]
+  VariableRef in MOI.LessThan{Float64}    : [135, 135]
+  VariableRef in MOI.ZeroOne              : [57, 57]
+numerical stability report
+  matrix range     [6e-03, 1e+02]
+  objective range  [1e+00, 5e+01]
+  bounds range     [1e+00, 9e+03]
+  rhs range        [6e+00, 1e+02]
+-------------------------------------------------------------------
+ iteration    simulation      bound        time (s)     solves  pid
+-------------------------------------------------------------------
+         1  -1.300000e+03 -1.840480e+02  2.910521e-01        84   1
+         2  -1.400000e+03 -1.840480e+02  3.451190e-01       168   1
+         3S -1.200000e+03 -7.809932e+02  5.838430e-01       252   1
+         4L -1.200000e+03 -9.306499e+02  1.323357e+00       336   1
+         5S -1.500000e+03 -9.306499e+02  1.599767e+00       420   1
+         6L -1.100000e+03 -9.306499e+02  2.349462e+00       504   1
+         7  -1.300000e+03 -9.306499e+02  2.400279e+00       588   1
+         8S -1.550000e+03 -9.306499e+02  2.671036e+00       672   1
+         9L -1.300000e+03 -9.306499e+02  3.408664e+00       756   1
+        10  -1.600000e+03 -9.306499e+02  3.459174e+00       840   1
+        11S -1.250000e+03 -9.306499e+02  3.716748e+00       924   1
+        12L -1.500000e+03 -9.306499e+02  4.448760e+00      1008   1
+        13  -1.500000e+03 -9.306499e+02  4.499164e+00      1092   1
+        14S -1.750000e+03 -9.306499e+02  4.752952e+00      1176   1
+        15L -1.500000e+03 -9.306934e+02  5.491146e+00      1260   1
+        16S -1.250000e+03 -9.306934e+02  5.759216e+00      1344   1
+        17L -1.200000e+03 -9.344269e+02  6.564554e+00      1428   1
+        18S -1.850000e+03 -9.344269e+02  6.841076e+00      1512   1
+        19L -1.400000e+03 -9.344269e+02  7.639142e+00      1596   1
+        20  -1.500000e+03 -9.344269e+02  7.691077e+00      1680   1
+        21S -1.050000e+03 -9.344269e+02  7.969397e+00      1764   1
+        22L -1.800000e+03 -9.344269e+02  8.770810e+00      1848   1
+        23  -1.500000e+03 -9.344269e+02  8.822820e+00      1932   1
+        24S -1.300000e+03 -9.344269e+02  9.089766e+00      2016   1
+        25L -1.650000e+03 -9.344269e+02  9.886264e+00      2100   1
+        26  -1.150000e+03 -9.344269e+02  9.950790e+00      2184   1
+        27S -1.250000e+03 -9.344269e+02  1.022519e+01      2268   1
+        28L -1.350000e+03 -9.344269e+02  1.102016e+01      2352   1
+        29  -1.750000e+03 -9.344269e+02  1.107657e+01      2436   1
+        30S -1.750000e+03 -9.344269e+02  1.135124e+01      2520   1
+        31L -1.150000e+03 -9.344269e+02  1.214883e+01      2604   1
+        32  -2.000000e+03 -9.344269e+02  1.220504e+01      2688   1
+        33S -1.450000e+03 -9.344269e+02  1.247523e+01      2772   1
+        34L -1.150000e+03 -9.344269e+02  1.327084e+01      2856   1
+        35  -1.100000e+03 -9.344269e+02  1.332709e+01      2940   1
+        36S -1.200000e+03 -9.344269e+02  1.360249e+01      3024   1
+        37L -1.050000e+03 -9.344269e+02  1.439664e+01      3108   1
+        38  -1.500000e+03 -9.344269e+02  1.445301e+01      3192   1
+        39S -1.250000e+03 -9.344269e+02  1.472328e+01      3276   1
+        40L -1.350000e+03 -9.344269e+02  1.551969e+01      3360   1
+        41  -1.700000e+03 -9.344269e+02  1.558102e+01      3444   1
+        42S -1.100000e+03 -9.344269e+02  1.585266e+01      3528   1
+        43L -1.200000e+03 -9.344269e+02  1.664752e+01      3612   1
+        44  -1.300000e+03 -9.344269e+02  1.670415e+01      3696   1
+        45S -1.200000e+03 -9.344269e+02  1.698091e+01      3780   1
+        46L -1.150000e+03 -9.344269e+02  1.777151e+01      3864   1
+        47  -1.500000e+03 -9.344269e+02  1.782830e+01      3948   1
+-------------------------------------------------------------------
+status         : bound_stalling
+total time (s) : 1.782830e+01
+total solves   : 3948
+best bound     : -9.344269e+02
+simulation ci  : -1.384043e+03 ± 6.698918e+01
+numeric issues : 0
+-------------------------------------------------------------------
+
+────────────────────────────────────────────────────────────────────────────────────
+                                           Time                    Allocations      
+                                  ───────────────────────   ────────────────────────
+        Tot / % measured:              17.9s /  99.5%           1.46GiB /  98.4%    
+
+Section                   ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────────────────
+backward_pass                 47    16.4s   92.0%   349ms   1.36GiB   94.8%  29.6MiB
+  solve_subproblem         2.82k    16.1s   90.5%  5.72ms   1.30GiB   90.6%   483KiB
+    get_dual_solution      2.82k    12.5s   70.3%  4.44ms   1.12GiB   78.3%   417KiB
+  prepare_backward_pass      282    140ms    0.8%   497μs   38.2MiB    2.6%   139KiB
+calculate_bound               47    1.15s    6.5%  24.5ms   60.1MiB    4.1%  1.28MiB
+  get_dual_solution          940    378μs    0.0%   402ns    147KiB    0.0%     160B
+forward_pass                  47    267ms    1.5%  5.69ms   15.7MiB    1.1%   342KiB
+  solve_subproblem           188    265ms    1.5%  1.41ms   14.4MiB    1.0%  78.5KiB
+    get_dual_solution        188   75.7μs    0.0%   403ns   29.4KiB    0.0%     160B
+  sample_scenario             47    552μs    0.0%  11.7μs    123KiB    0.0%  2.62KiB
+────────────────────────────────────────────────────────────────────────────────────
+

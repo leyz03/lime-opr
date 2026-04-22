@@ -1,0 +1,107 @@
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+-------------------------------------------------------------------
+         SDDP.jl (c) Oscar Dowson and contributors, 2017-25
+-------------------------------------------------------------------
+problem
+  nodes           : 4
+  state variables : 83
+  scenarios       : 1.60000e+05
+  existing cuts   : false
+options
+  solver          : serial mode
+  risk measure    : SDDP.Expectation()
+  sampling scheme : SDDP.InSampleMonteCarlo
+subproblem structure
+  VariableRef                             : [308, 308]
+  AffExpr in MOI.EqualTo{Float64}         : [110, 110]
+  AffExpr in MOI.GreaterThan{Float64}     : [57, 57]
+  AffExpr in MOI.LessThan{Float64}        : [84, 84]
+  VariableRef in MOI.GreaterThan{Float64} : [164, 165]
+  VariableRef in MOI.Integer              : [119, 119]
+  VariableRef in MOI.LessThan{Float64}    : [135, 135]
+  VariableRef in MOI.ZeroOne              : [57, 57]
+numerical stability report
+  matrix range     [6e-03, 1e+02]
+  objective range  [1e+00, 5e+01]
+  bounds range     [1e+00, 9e+03]
+  rhs range        [6e+00, 1e+02]
+-------------------------------------------------------------------
+ iteration    simulation      bound        time (s)     solves  pid
+-------------------------------------------------------------------
+         1L -1.550000e+03 -9.306499e+02  2.270604e+00        84   1
+         2L -1.300000e+03 -9.306499e+02  3.022098e+00       168   1
+         3L -1.850000e+03 -9.315787e+02  3.771609e+00       252   1
+         4L -1.550000e+03 -9.318431e+02  4.570197e+00       336   1
+         5L -1.750000e+03 -9.318431e+02  5.377162e+00       420   1
+         6L -1.900000e+03 -9.318431e+02  6.184200e+00       504   1
+         7L -1.350000e+03 -9.318431e+02  6.990069e+00       588   1
+         8L -1.400000e+03 -9.318431e+02  7.841696e+00       672   1
+         9L -1.700000e+03 -9.318431e+02  8.698911e+00       756   1
+        10L -1.250000e+03 -9.318431e+02  9.650601e+00       840   1
+        11L -1.150000e+03 -9.318431e+02  1.047955e+01       924   1
+        12L -1.250000e+03 -9.318431e+02  1.137641e+01      1008   1
+        13L -9.500000e+02 -9.318431e+02  1.219131e+01      1092   1
+        14L -1.300000e+03 -9.318431e+02  1.319540e+01      1176   1
+        15L -1.100000e+03 -9.318431e+02  1.405212e+01      1260   1
+        16L -1.300000e+03 -9.318431e+02  1.485704e+01      1344   1
+        17L -1.250000e+03 -9.318431e+02  1.566609e+01      1428   1
+        18L -1.450000e+03 -9.318431e+02  1.648062e+01      1512   1
+        19L -1.500000e+03 -9.318431e+02  1.728511e+01      1596   1
+        20L -1.450000e+03 -9.318431e+02  1.808711e+01      1680   1
+        21L -1.550000e+03 -9.318431e+02  1.889111e+01      1764   1
+        22L -1.850000e+03 -9.318431e+02  1.970230e+01      1848   1
+        23L -1.700000e+03 -9.318431e+02  2.050562e+01      1932   1
+        24L -1.600000e+03 -9.318431e+02  2.130714e+01      2016   1
+        25L -1.050000e+03 -9.318431e+02  2.211407e+01      2100   1
+        26L -1.250000e+03 -9.318431e+02  2.291927e+01      2184   1
+        27L -1.600000e+03 -9.318431e+02  2.372669e+01      2268   1
+        28L -1.550000e+03 -9.318431e+02  2.453034e+01      2352   1
+        29L -1.100000e+03 -9.318431e+02  2.533664e+01      2436   1
+        30L -1.500000e+03 -9.318431e+02  2.614250e+01      2520   1
+        31L -1.700000e+03 -9.318431e+02  2.694825e+01      2604   1
+        32L -1.550000e+03 -9.318431e+02  2.775424e+01      2688   1
+        33L -1.550000e+03 -9.318431e+02  2.859595e+01      2772   1
+        34L -1.650000e+03 -9.318431e+02  2.939785e+01      2856   1
+-------------------------------------------------------------------
+status         : bound_stalling
+total time (s) : 2.939785e+01
+total solves   : 2856
+best bound     : -9.318431e+02
+simulation ci  : -1.455882e+03 ± 8.137070e+01
+numeric issues : 0
+-------------------------------------------------------------------
+
+────────────────────────────────────────────────────────────────────────────────────
+                                           Time                    Allocations      
+                                  ───────────────────────   ────────────────────────
+        Tot / % measured:              29.4s /  99.8%           2.16GiB /  98.9%    
+
+Section                   ncalls     time    %tot     avg     alloc    %tot      avg
+────────────────────────────────────────────────────────────────────────────────────
+backward_pass                 34    28.2s   96.0%   830ms   2.08GiB   97.5%  62.8MiB
+  solve_subproblem         2.04k    27.4s   93.4%  13.5ms   1.85GiB   86.5%   951KiB
+    get_dual_solution      2.04k    23.4s   79.7%  11.5ms   1.69GiB   79.0%   868KiB
+  prepare_backward_pass      204    291ms    1.0%  1.42ms   38.9MiB    1.8%   195KiB
+calculate_bound               34    971ms    3.3%  28.5ms   43.5MiB    2.0%  1.28MiB
+  get_dual_solution          680    275μs    0.0%   404ns    106KiB    0.0%     160B
+forward_pass                  34    210ms    0.7%  6.16ms   12.0MiB    0.5%   362KiB
+  solve_subproblem           136    208ms    0.7%  1.53ms   11.1MiB    0.5%  83.5KiB
+    get_dual_solution        136   55.4μs    0.0%   407ns   21.2KiB    0.0%     160B
+  sample_scenario             34    456μs    0.0%  13.4μs   89.9KiB    0.0%  2.64KiB
+────────────────────────────────────────────────────────────────────────────────────
+

@@ -1,0 +1,9 @@
+encoding,handler,final_bound,n_iters,stall_iter,status
+int,CCD,-184.048,0,0,iteration_limit
+int,SCD,-780.9932,0,0,iteration_limit
+int,LD,-931.8431,34,2,bound_stalling
+int,Bandit,-934.4269,16,2,bound_stalling
+bin,CCD,-184.048,0,0,iteration_limit
+bin,SCD,-780.9932,0,0,iteration_limit
+bin,LD,-998.0,33,4,bound_stalling
+bin,Bandit,-780.9932,10,2,bound_stalling
