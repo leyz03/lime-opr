@@ -461,20 +461,34 @@ SDDP 仿真 μ（K=20）: -1430 ~ -1450 ← SDDP 策略在新样本上的期望�
 - EF(K=5) 比 SDDP 仿真好（-1080 > -1440）是因为 EF 对固定的 5 个场景过拟合（in-sample optimal）。
 - SDDP bound（-998）比 EF(K=5) 更紧（-998 > -1080）说明 SDDP 上界在这组场景下仍偏松。
 
-#### 若需精确对比
+#### EF 随 K 的变化（同 seed=42）
 
-需对同一 K 同时跑 EF 和 SDDP：
+| K | 路径数 K^T | 建模时间 | 求解时间 | EF 最优值 |
+|---|---|---|---|---|
+| 5 | 625 | 4s | 1.1s | -1080 |
+| 8 | 4,096 | 40s | 16s | -1150 |
+| 10 | 10,000 | 185s | 40s | **-1220** |
+| 20 | 160,000 | >1800s（建模超时）| — | 不可行 |
 
-```julia
-# K=5，相同场景集（seed=42）
-model_ef   = build_model(p; encoding=:int, K=5)
-ef = SDDP.deterministic_equivalent(model_ef, Gurobi.Optimizer)   # → -1080
+EF 随 K 增大越来越负，符合理论：更多场景 = 策略须兼顾更多情形 = in-sample 目标值趋向真实随机最优。
 
-model_sddp = build_model(p; encoding=:int, K=5)
-train_with_handler(model_sddp, :LD; encoding=:int, iter_limit=100)
-evaluate_policy(model_sddp, p; nsim=500)    # → bound + simulation μ
-# gap_vs_EF = (sddp_bound - ef_optimal) / |ef_optimal| × 100
+**外推 EF(K=20) ≈ -1400\~1450**，与 SDDP 仿真 μ ≈ -1430\~1450 高度吻合。
+
+#### 完整数值关系图
+
 ```
+真实最优（连续分布）
+     ↑ 趋近
+EF(K=10) = -1220  ←  in-sample SAA 最优（越大 K 越紧）
+EF(K=8)  = -1150
+EF(K=5)  = -1080
+
+SDDP 仿真 μ ≈ -1440  ←  策略在 out-of-sample 路径上的期望值（下界）
+
+SDDP bound ≈ -932 ~ -998  ←  对真实最优的上界（越负越紧）
+```
+
+**SDDP bound（-932~-998）比 EF(K=10)（-1220）宽松约 220~288 单位**，说明 SDDP 的割还远未收紧到 SAA 真实最优。这与 EXP-008 的结论一致：cut 多样性不足是主要瓶颈。
 
 *Add new experiments below this line following the EXP-NNN format.*
 
