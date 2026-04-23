@@ -228,10 +228,12 @@ binary 展开状态与连续 A/U/P 混合后，LD 的 Lagrangian relaxation 初�
 
 ---
 
-### EXP-005 — Extensive Form 基准（SAA 真实最优）
+### EXP-005 — Extensive Form K 扫描（SAA 规模分析）
 **Date:** 2026-04-23  
-**Purpose:** 用 `SDDP.deterministic_equivalent` 求 SAA 真实最优，作为 SDDP bound 的对比基准。  
+**Purpose:** 观察 EF 最优值和求解时间随 K 的变化，分析 SAA 收敛性质。  
 **Script:** `experiment/run_ef_new.jl` → `results/ef_new/ef_new.csv`
+
+> ⚠️ **注意**：本实验中 EF(K) 和 EXP-004 的 SDDP(K=20) 解的是**不同 SAA 问题**（场景数不同），不能直接对比 gap。严格的 SDDP vs EF 对比见 EXP-006。
 
 #### EF 求解结果（seed=42）
 
@@ -241,26 +243,15 @@ binary 展开状态与连续 A/U/P 混合后，LD 的 Lagrangian relaxation 初�
 | 8 | 4,096 | 28.3s | 60.2s | 88.5s | **−2.02** | 0.0% |
 | 10 | 10,000 | 155.4s | 289.0s | 444.4s | **−57.47** | 0.008% |
 
-#### 与 EXP-004 SDDP bounds 对比（K=20）
-
-| SDDP handler | bound（K=20） | vs EF(K=5) | vs EF(K=10) |
-|---|---|---|---|
-| int+CCD | 50.85 | gap=−24% | bound 仍在 EF 之上 ✓ |
-| int+LD  | 50.15 | gap=−25% | bound 仍在 EF 之上 ✓ |
-| bin+SCD | 49.22 | gap=−27% | bound 仍在 EF 之上 ✓ |
-
-> 所有 SDDP bound（~50）严格大于所有 K 下的 EF 最优，上界关系成立。
-
 #### 关键发现
 
-**1. EF 最优值随 K 急剧下降（+67 → −2 → −57），仍未收敛。**  
-K 小时 EF 对少量场景过拟合（目标偏高），K 增大后约束变难，最优值下降。EF(K→∞) 外推约在 −100 ~ −200。
+**1. EF 最优值随 K 急剧下降（+67 → −2 → −57），符合 SAA 理论。**  
+EF(K) 是 K 场景 SAA 问题的精确最优，是真实随机最优 z* 的有偏估计：E[EF(K)] ≥ z*。K 小时策略只需对少数场景表现好（过拟合，目标偏高）；K 增大后须兼顾更多情形，目标值收紧趋向 z*。这是 SAA 的正常性质，非模型问题。
 
-**2. SDDP bound（~+50）与 EF(K=20,外推≈−100）之间存在约 150 的 gap。**  
-说明 cut 还未充分收紧。需要更多迭代或更大 K 的 SDDP 才能缩小 gap。
+**2. EF(K→∞) 外推 z* ≈ −100 ~ −200。**  
+EF(K=10)=−57 仍高于真实最优，随 K 仍在下降。
 
-**3. 求解时间随 K 快速增长。**  
-K=10 需要 444s（K^T=10000 条路径）；K=20 路径数 160,000，EF 不可行（建模超时）。
+**3. 求解时间随 K^T 快速增长，K=20 不可行（路径数 160,000，建模超时）。**
 
 #### 数值关系图
 
