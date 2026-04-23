@@ -8,7 +8,7 @@ Checks:
   4. Model has correct number of stages
 """
 
-include("src/build_model.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
 
 cfg = LinearScenarioConfig(n_nodes=3, T=4, total_bikes=12, total_workers=6)
 p   = build_params(cfg; seed=42)

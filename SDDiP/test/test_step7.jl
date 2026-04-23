@@ -6,13 +6,13 @@ objective, then checks that the stage objective is set and has the expected
 sign structure.
 """
 
-include("src/parameters.jl")
-include("src/scenarios.jl")
-include("src/states_int.jl")
-include("src/states_bin.jl")
-include("src/controls.jl")
-include("src/constraints.jl")
-include("src/objective.jl")
+include(joinpath(@__DIR__, "..", "src", "parameters.jl"))
+include(joinpath(@__DIR__, "..", "src", "scenarios.jl"))
+include(joinpath(@__DIR__, "..", "src", "states_int.jl"))
+include(joinpath(@__DIR__, "..", "src", "states_bin.jl"))
+include(joinpath(@__DIR__, "..", "src", "controls.jl"))
+include(joinpath(@__DIR__, "..", "src", "constraints.jl"))
+include(joinpath(@__DIR__, "..", "src", "objective.jl"))
 
 using JuMP, SDDP, Gurobi
 

@@ -7,8 +7,8 @@ Checks for each of the 5 duality handlers:
   3. bound is strictly less than the initial upper bound (cuts were added)
 """
 
-include("src/build_model.jl")
-include("src/train.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
 
 cfg = LinearScenarioConfig(n_nodes=3, T=2, total_bikes=12, total_workers=6)
 p   = build_params(cfg; seed=42)

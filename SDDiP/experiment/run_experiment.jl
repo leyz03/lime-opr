@@ -19,9 +19,9 @@ Usage:
   julia --project=. run_experiment.jl --smoke   # quick 3-iter smoke test
 """
 
-include("src/build_model.jl")
-include("src/train.jl")
-include("src/simulate.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
+include(joinpath(@__DIR__, "..", "src", "simulate.jl"))
 
 using CSV, DataFrames
 

@@ -10,8 +10,8 @@ Usage:
   julia --project=. run_exp_convergence.jl --k 20   # override K (default 20)
 """
 
-include("src/build_model.jl")
-include("src/train.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
 
 using CSV, DataFrames
 

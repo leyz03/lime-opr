@@ -10,9 +10,9 @@ EF values (precomputed, seed=42):
 Output: results/exp_kcompare.csv
 """
 
-include("src/build_model.jl")
-include("src/train.jl")
-include("src/simulate.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
+include(joinpath(@__DIR__, "..", "src", "simulate.jl"))
 
 using CSV, DataFrames
 

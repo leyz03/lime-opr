@@ -10,9 +10,9 @@ Run:
 """
 
 using Pkg
-Pkg.activate(@__DIR__)
+Pkg.activate(joinpath(@__DIR__, ".."))
 
-include("cuts.jl")   # pulls in stage_problem.jl → scenario.jl
+include(joinpath(@__DIR__, "..", "cuts.jl"))   # pulls in stage_problem.jl → scenario.jl
 
 using HiGHS
 using JuMP

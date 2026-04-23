@@ -14,8 +14,8 @@ Look for:
   • Oscillation                       → numeric precision issue
 """
 
-include("src/build_model.jl")
-include("src/train.jl")
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
 
 # ── Parse args ──────────────────────────────────────────────────────────────
 function get_arg(key, default::Int)

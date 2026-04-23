@@ -9,12 +9,12 @@ Builds a 1-stage LinearPolicyGraph for each encoding and checks:
   5. t_ij==1 (immediate return) and t_ij>=2 (pipeline P) pair counts
 """
 
-include("src/parameters.jl")
-include("src/scenarios.jl")
-include("src/states_int.jl")
-include("src/states_bin.jl")
-include("src/controls.jl")
-include("src/constraints.jl")
+include(joinpath(@__DIR__, "..", "src", "parameters.jl"))
+include(joinpath(@__DIR__, "..", "src", "scenarios.jl"))
+include(joinpath(@__DIR__, "..", "src", "states_int.jl"))
+include(joinpath(@__DIR__, "..", "src", "states_bin.jl"))
+include(joinpath(@__DIR__, "..", "src", "controls.jl"))
+include(joinpath(@__DIR__, "..", "src", "constraints.jl"))
 
 using JuMP, SDDP, Gurobi
 
@@ -72,7 +72,7 @@ function test_constraints(encoding::Symbol)
 
     # Big-M constants
     @assert p.Q1 == Float64(p.W_tot)   "Q1 wrong: $(p.Q1)"
-    @assert p.Q2 == cfg.price_ub       "Q2 wrong: $(p.Q2)"
+    @assert p.Q2 >= maximum(p.p_jk)    "Q2 wrong: $(p.Q2) < max(p_jk)=$(maximum(p.p_jk))"
     println("  ✓  Q1=$(p.Q1), Q2=$(p.Q2), Q3=$(p.Q3)")
 
     # t_ij pair counts

@@ -19,8 +19,8 @@ Output:
   prints EF optimal value, compare with SDDP bounds from experiments
 """
 
-include("src/build_model.jl")
-include("src/train.jl")   # for build_params / LinearScenarioConfig
+include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
+include(joinpath(@__DIR__, "..", "src", "train.jl"))
 
 using JuMP, Gurobi
 

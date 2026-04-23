@@ -47,9 +47,10 @@ Base.@kwdef struct LinearScenarioConfig
 
     # Economics
     revenue_level::Float64 = 20.0
-    penalty_Cp::Float64    = 50.0
-    price_ub::Float64      = 100.0
-    p_jk_level::Float64    = 50.0   # fixed task price p[j,k] = p_jk_level for all (j,k)
+    penalty_Cp::Float64    = 5.0
+    price_ub::Float64      = 10.0
+    p_jk_level::Float64    = 5.0   # base task price (intercept)
+    p_jk_slope::Float64    = 0.0   # wage per unit of task duration c_jk; 0 = flat pricing
 
     # Initial backlog
     initial_backlog_level::Int = 0
@@ -198,7 +199,7 @@ function build_params(cfg::LinearScenarioConfig; seed::Int=0)::BikeParams
 
     # ── Revenue and prices ────────────────────────────────────────────────────
     R_mat = fill(cfg.revenue_level, n, n)
-    p_mat = fill(cfg.p_jk_level, n, n)
+    p_mat = [cfg.p_jk_level + cfg.p_jk_slope * c_mat[j, k] for j in 1:n, k in 1:n]
 
     # ── Demand Poisson rates: λ_ijt[i,j,t] = base_i × mult_t / n ─────────────
     base_demand = if cfg.base_demand_by_node !== nothing
@@ -240,7 +241,7 @@ function build_params(cfg::LinearScenarioConfig; seed::Int=0)::BikeParams
     # Q2 ≥ max p_jk  → s[i] upper/lower bound Big-M
     # Q3 ≥ Σ(A0+U0) → task pool Big-M
     Q1 = Float64(W_tot)
-    Q2 = cfg.price_ub            # max possible p_jk value
+    Q2 = maximum(p_mat)          # tight Big-M: Q2 ≥ max p_jk
     Q3 = Float64(sum(A0) + sum(U0) + sum(abs.(M0)) + 1)
 
     return BikeParams(

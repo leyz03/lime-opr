@@ -14,7 +14,7 @@ Model alignment:
 using JSON, JuMP, Gurobi
 
 # ─── Load parameters from Python export ──────────────────────────────────────
-json_path = joinpath(@__DIR__, "compare_params.json")
+json_path = joinpath(@__DIR__, "..", "compare_params.json")
 p_json    = JSON.parsefile(json_path)
 
 n     = p_json["n"]
