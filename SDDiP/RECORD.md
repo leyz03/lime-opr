@@ -604,20 +604,20 @@ Expected-cost function shaped by cuts is loose
 **Config:** `common_setting.jl` — n=3, T=4, bikes=12, workers=6, A0=[2,5,5]（反向）, W0=[0,3,3], base_demand=[6,1,1]（不对称）  
 **Params:** K=20, iter_limit=300, stall_iters=30, oa_iters=50, time_limit=Inf  
 **Script:** `experiment/run_exp_008_new.jl` → `results/exp_008_new/`  
-**Note:** 手动在 bin_LD 第 68 次迭代时终止，bin_Bandit 未运行。
+**Note:** bin_LD 在第 68 次迭代时手动终止（bound 冻结在 8629）；bin+Bandit 事后补跑完成。
 
 #### 结果汇总
 
-| Cell | 迭代数 | 初始 bound | 最终 bound | 停止原因 |
-|---|---|---|---|---|
-| int+CCD | 300 | 318.4 | **50.85** | iteration_limit |
-| int+SCD | 300 | — | **49.76** | iteration_limit |
-| int+LD | 300 | 425.2 | **50.15** | iteration_limit |
-| int+Bandit | 300 | 325.3 | **50.44** | iteration_limit |
-| bin+CCD | 300 | 312.7 | **50.03** | iteration_limit |
-| bin+SCD | 300 | — | **49.22** | iteration_limit |
-| bin+LD | 68（手动终止） | **8629**（冻结） | 8629 | 手动 kill |
-| bin+Bandit | 未运行 | — | — | — |
+| Cell | 迭代数 | 初始 bound | 最终 bound | 停止原因 | Bandit 臂选择 |
+|---|---|---|---|---|---|
+| int+CCD | 300 | 318.4 | **50.85** | iteration_limit | — |
+| int+SCD | 300 | — | **49.76** | iteration_limit | — |
+| int+LD | 300 | 425.2 | **50.15** | iteration_limit | — |
+| int+Bandit | 300 | 325.3 | **50.44** | iteration_limit | — |
+| bin+CCD | 300 | 312.7 | **50.03** | iteration_limit | — |
+| bin+SCD | 300 | — | **49.22** | iteration_limit | — |
+| bin+LD | 68（手动终止） | **8629**（冻结） | 8629 | 手动 kill | — |
+| bin+Bandit | 300 | 168.5 | **50.69** | iteration_limit | CCD×281, SCD×17, LD×2 |
 
 #### 关键观察
 
@@ -630,7 +630,10 @@ Expected-cost function shaped by cuts is loose
 **3. 300 次迭代后 bound 仍未收敛（仍在缓慢下降）。**  
 与旧 EXP-008 不同，BoundStalling(30) 未触发，说明 cut 仍在持续改善，iter_limit 是瓶颈而非 cut 质量上限。各 handler bound 差异 < 2（50.85 vs 49.22），彼此接近。
 
-**4. bin+LD 出现异常：bound 从第 1 次迭代冻结在 8629（大 M 量级）。**  
+**4. bin+Bandit：Bandit 主导选 CCD 臂，bound 正常收敛至 50.69。**  
+300 次迭代中 CCD 被选 281 次、SCD 17 次、LD 仅 2 次。LD 臂因每次耗时极高（OA 内层迭代），Bandit 的 Δbound/Δt 奖励函数惩罚了慢臂，导致 LD 几乎不被选中。最终 bound（50.69）与纯 CCD（50.85）接近，说明在本 setting 下 Bandit 退化为 CCD。
+
+**5. bin+LD 出现异常：bound 从第 1 次迭代冻结在 8629（大 M 量级）。**  
 8629 ≈ `B_max × (R + C_p)` 量级，疑为 LP relaxation 初始 bound 极松（二进制展开 + LD 的 OA 子问题未正确收紧）。原因待查，可能是 `states_bin.jl` 修改后 binary state 与连续 A/U/P 混合导致 LD 的 Lagrangian relaxation 设定有误。
 
 #### 与原 EXP-008 对比
