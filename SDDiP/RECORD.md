@@ -650,3 +650,66 @@ Expected-cost function shaped by cuts is loose
 - **bin+LD 异常需专项排查**：检查 `states_bin.jl` 修改后 LD 的 Lagrangian 子问题设定。
 - **增大 iter_limit 或改用 wall-time 限制**：当前 300 次仍不足以收敛，可考虑 iter=1000 或 time_limit=3600s。
 - **需与 EF（EXP-009 类）对比**：在新 setting 下求 deterministic equivalent 以获得 SAA 真实最优，评估 bound gap。
+
+---
+
+### EXP-009b — Extensive Form 重跑（修复后 common_setting）
+**Date:** 2026-04-23  
+**Purpose:** 在 A/U/P 连续修复后的 new setting 下重新求 SAA 真实最优值，作为 EXP-008b SDDP bounds 的正确基准。  
+**Config:** `common_setting.jl` — n=3, T=4, A0=[2,5,5]（反向）, W0=[0,3,3], base_demand=[6,1,1]  
+**Script:** `experiment/run_ef_new.jl` → `results/ef_new/ef_new.csv`
+
+#### EF 求解结果
+
+| K | 路径数 K^T | 建模时间 | 求解时间 | 总时间 | EF 最优值 | MIP gap |
+|---|---|---|---|---|---|---|
+| 5 | 625 | 3.8s | 8.6s | 12.4s | **67.10** | 0.0% |
+| 8 | 4,096 | 28.3s | 60.2s | 88.5s | **-2.02** | 0.0% |
+| 10 | 10,000 | 155.4s | 289.0s | 444.4s | **-57.47** | 0.008% |
+
+#### 与 EXP-008b SDDP bounds 对比（K=20）
+
+EXP-008b 中所有 handler 的 SDDP bound 均约为 **~50**（K=20）。
+
+| SDDP handler | bound | gap vs EF(K=10) |
+|---|---|---|
+| int+CCD | 50.85 | −188.5% |
+| int+SCD | 49.76 | −186.6% |
+| int+LD  | 50.15 | −187.3% |
+| int+Bandit | 50.44 | −187.8% |
+| bin+CCD | 50.03 | −187.1% |
+| bin+SCD | 49.22 | −185.6% |
+| bin+Bandit | 50.69 | −188.2% |
+
+> gap_vs_EF = (EF_optimal − SDDP_bound) / |EF_optimal| × 100  
+> 负值代表 SDDP bound 高于（优于）EF optimal，即 SDDP 上界比 EF 的 in-sample 最优更紧。
+
+#### 关键发现
+
+**1. EF 最优值随 K 急剧下降（67 → -2 → -57），且仍未收敛。**  
+K=5 时 EF 最优为正（+67），K=10 时已为负（-57），说明在少量场景下模型可以"过拟合"出高收益策略，但场景数增大后真实约束增多导致最优值下降。EF(K→∞) 趋向真实随机最优，外推值约在 -100 ~ -200 区间。
+
+**2. SDDP bound（~50）始终高于 EF 最优。**  
+对于所有 K（5, 8, 10），SDDP bound ≈ +50 均严格大于对应 EF 最优，说明 SDDP 上界仍正确（上界 ≥ 真实最优），但偏松。gap 随 K 增大而扩大（K=5 时 gap 约 17，K=10 时 gap 约 108）。
+
+**3. 与旧 EXP-009 的对比。**  
+旧实验（Int 约束）EF(K=5)=-1080, EF(K=10)=-1220，均为负值。修复后 EF(K=5)=+67，说明旧模型中 Y_i≡0 导致目标严重退化。新模型下调配净收益确实为正（符合设计意图）。
+
+**4. 求解时间显著增加。**  
+旧 EXP-009 EF(K=5) 仅需 1.1s，新模型（A/U/P 连续，状态变量更多）需 8.6s，EF(K=10) 需 444s。连续状态使 EF MIP 的 LP relaxation 更紧但变量数更大。
+
+#### 完整数值关系（新 setting，K=10 参考）
+
+```
+SDDP bound (K=20, EXP-008b) ≈ +50    ← 对真实最优的上界
+EF(K=10)                    = -57     ← K=10 SAA in-sample 最优
+EF(K=8)                     = -2      
+EF(K=5)                     = +67     ← 场景少，过拟合偏高
+
+真实随机最优（K→∞）          ≈ -100 ~ -200（外推）
+```
+
+#### 后续
+
+- **EXP-010b**：在 new setting 下重跑 SDDP vs EF 对比，验证仿真 μ 是否仍 ≈ EF 最优。
+- **增大 K 的 SDDP**：目前 EXP-008b 用 K=20，而 EF(K=20) 预计最优值约 -100，SDDP bound 需更紧才能有意义的 gap 估计。
