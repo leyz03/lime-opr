@@ -269,9 +269,53 @@ EF(K→∞) 外推               ≈ -100 ~ -200
 
 | 实验 | 目标 | 状态 |
 |---|---|---|
-| EXP-006 | SDDP vs EF 对比（same K, new setting）——验证仿真 μ ≈ EF 最优 | 待运行 |
+| EXP-006 | SDDP vs EF 对比（same K, new setting）——验证仿真 μ ≈ EF 最优 | ✅ 完成 |
 | EXP-007 | K 敏感性（K=5/10/20/50），新 setting | 待运行 |
 | EXP-008 | bin+LD 异常排查（bound 冻结在 8629） | 待运行 |
 | EXP-009 | 大规模 setting（n=10, T=20）初步测试 | 待运行 |
+
+---
+
+### EXP-006 — SDDP vs EF 严格对比（相同 K）
+**Date:** 2026-04-23  
+**Purpose:** 在相同 K 和 seed 下同时跑 SDDP（int 编码全 4 种 handler）和 EF，做严格的上界 gap 和策略质量分析。  
+**Config:** `common_setting.jl`，int 编码，K=5/8，iter=200，nsim=300  
+**Script:** `experiment/run_exp_006.jl` → `results/exp_006/exp_006.csv`
+
+#### 结果
+
+**K=5（EF optimal = +67.10，625 条路径）**
+
+| Handler | SDDP bound | gap_bound | 仿真 μ | gap_sim | 训练时间 |
+|---|---|---|---|---|---|
+| CCD | 82.52 | +23.0% | 59.98 | −10.6% | 12.2s |
+| SCD | 81.35 | +21.2% | 71.24 | +6.2% | 18.8s |
+| LD  | 82.12 | +22.4% | 58.36 | −13.0% | 24.3s |
+| Bandit | 81.96 | +22.1% | 60.63 | −9.7% | 25.4s |
+
+**K=8（EF optimal = −2.02，4096 条路径）**
+
+| Handler | SDDP bound | gap_bound（绝对值） | 仿真 μ | 训练时间 |
+|---|---|---|---|---|
+| CCD | 10.36 | +12.4 | 7.92 | 19.1s |
+| SCD | 9.74 | +11.8 | 9.23 | 45.6s |
+| LD  | 9.94 | +12.0 | −9.31 | 93.8s |
+| Bandit | 9.62 | +11.6 | −20.35 | 32.0s |
+
+> K=8 的百分比 gap 因 EF≈−2 接近零被放大（614%），以绝对值约 12 单位为准。
+
+#### 关键发现
+
+**1. SDDP bound 始终严格大于同 K 下 EF optimal，上界关系成立。** ✓  
+K=5 时 gap_bound ≈ 21-23%（绝对约 15 单位）；K=8 时绝对 gap ≈ 12 单位。各 handler 之间 bound 差异极小（<1 单位），说明 handler 选择对上界松紧影响有限。
+
+**2. K=5 仿真 μ 与 EF optimal 量级接近，但未严格低于 EF。**  
+μ 在 58~71 之间，EF=67。SCD 的 μ=71 略高于 EF=67，因为仿真使用 out-of-sample 新场景，EF 的 in-sample 最优不是 out-of-sample 的上界。这是正常现象。
+
+**3. K=8 仿真 μ 在 handler 间差异显著（+9 到 −20）。**  
+CCD/SCD 的 μ 约 8~9（高于 EF=−2），LD/Bandit 的 μ 约 −9~−20（低于 EF）。LD 和 Bandit 在 K=8 下策略质量不稳定，可能是 200 次迭代不足以在更大场景集上充分训练。
+
+**4. 策略质量（μ ≈ EF）仅在 K=5 成立，K=8 下有偏差。**  
+与旧 EXP-010（错误 Int setting）不同，新 setting 下 μ ≈ EF 的结论不再普遍成立——需要更多迭代（iter>200）才能在 K=8 场景集上训练出高质量策略。
 
 *Add new experiments below this line following the EXP-NNN format.*

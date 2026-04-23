@@ -91,15 +91,15 @@ for K in K_LIST
             gap_bound = isnan(ef_opt) ? NaN :
                 (bound - ef_opt) / max(abs(ef_opt), 1.0) * 100
             gap_sim   = isnan(ef_opt) ? NaN :
-                (sim.mu - ef_opt) / max(abs(ef_opt), 1.0) * 100
+                (sim.μ - ef_opt) / max(abs(ef_opt), 1.0) * 100
 
-            println("bound=$(round(bound;digits=2))  μ=$(round(sim.mu;digits=2))  " *
+            println("bound=$(round(bound;digits=2))  μ=$(round(sim.μ;digits=2))  " *
                     "gap_bound=$(round(gap_bound;digits=1))%  " *
                     "gap_sim=$(round(gap_sim;digits=1))%  " *
                     "time=$(round(t_train;digits=1))s")
 
             (K=K, handler=string(handler), ef_optimal=ef_opt,
-             sddp_bound=bound, sim_mu=sim.mu, sim_ci=sim.ci,
+             sddp_bound=bound, sim_mu=sim.μ, sim_ci=sim.ci,
              gap_bound_pct=gap_bound, gap_sim_pct=gap_sim,
              train_time=round(t_train;digits=1),
              ef_build_time=round(t_ef_build;digits=1),
