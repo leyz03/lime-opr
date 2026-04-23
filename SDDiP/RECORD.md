@@ -506,17 +506,17 @@ SDDP bound ≈ -932 ~ -998  ←  对真实最优的上界（越负越紧）
 
 #### 全 2×4 详细结果
 
-**K=5 (EF=-1080)**
+**K=5 Scenatio=625 (EF=-1080)**
 
 | Cell | Bound | μ | gap% | vs_EF% | Time(s) | SAA Time(s)|
 |---|---|---|---|---|---|---|
-| int+CCD | -174.4 | -1082.4 | 83.9% | 83.9% | 8.1 | 1.1(4)| 
+| int+CCD | -174.4 | -1082.4 | 83.9% | 83.9% | 8.1 | 1.1| 
 | int+SCD | -636.3 | -1086.1 | 41.4% | 41.1% | 7.4 |  
 | int+LD | -635.3 | -1071.0 | 40.7% | 41.2% | 16.4 |  
 | int+Bandit | -636.3 | -1083.5 | 41.3% | 41.1% | 2.0 | 
 | bin+LD | -273.0 | -1081.3 | 74.8% | 74.7% | 83.1 | 
 
-**K=8 (EF=-1150)**
+**K=8 Scenatio=4096 (EF=-1150)**
 
 | Cell | Bound | μ | gap% | vs_EF% | Time(s) | SAA Time(s)|
 |---|---|---|---|---|---|---|
@@ -526,7 +526,7 @@ SDDP bound ≈ -932 ~ -998  ←  对真实最优的上界（越负越紧）
 | int+Bandit | -772.1 | -1149.3 | 32.8% | **32.9%** | 2.9 |
 | bin+LD | -168.3 | -1202.6 | 86.0% | 85.4% | 59.0 |
 
-**K=10 (EF=-1220)**
+**K=10 scenario=10000 (EF=-1220)**
 
 | Cell | Bound | μ | gap% | vs_EF% | Time(s) |SAA Time(s)|
 |---|---|---|---|---|---|---|
@@ -595,3 +595,55 @@ Expected-cost function shaped by cuts is loose
 |---|---|---|
 | 20（原默认） | -318，零改善 | 内层不收敛 |
 | **50（推荐）** | **-983**，iter 3 收敛 | 需先 patch SDDP.jl（见 EXP-004b） |
+
+---
+
+### EXP-008b — EXP-008 重跑（修复后 common_setting）
+**Date:** 2026-04-22  
+**Purpose:** 在 `states_int.jl` / `states_bin.jl` 修复（A, U, P 从 `Int` 改为连续变量）后，用新 baseline setting 重跑全 2×4 收敛诊断，观察行为变化。  
+**Config:** `common_setting.jl` — n=3, T=4, bikes=12, workers=6, A0=[2,5,5]（反向）, W0=[0,3,3], base_demand=[6,1,1]（不对称）  
+**Params:** K=20, iter_limit=300, stall_iters=30, oa_iters=50, time_limit=Inf  
+**Script:** `experiment/run_exp_008_new.jl` → `results/exp_008_new/`  
+**Note:** 手动在 bin_LD 第 68 次迭代时终止，bin_Bandit 未运行。
+
+#### 结果汇总
+
+| Cell | 迭代数 | 初始 bound | 最终 bound | 停止原因 |
+|---|---|---|---|---|
+| int+CCD | 300 | 318.4 | **50.85** | iteration_limit |
+| int+SCD | 300 | — | **49.76** | iteration_limit |
+| int+LD | 300 | 425.2 | **50.15** | iteration_limit |
+| int+Bandit | 300 | 325.3 | **50.44** | iteration_limit |
+| bin+CCD | 300 | 312.7 | **50.03** | iteration_limit |
+| bin+SCD | 300 | — | **49.22** | iteration_limit |
+| bin+LD | 68（手动终止） | **8629**（冻结） | 8629 | 手动 kill |
+| bin+Bandit | 未运行 | — | — | — |
+
+#### 关键观察
+
+**1. 所有完成的 handler bound 均收敛至 ~50，而非旧 EXP-008 的负值（-184 ~ -998）。**  
+新 setting 经济参数（R=20, C_p=30, p_jk=4）使目标函数为正，正确反映"调配净收益 > 0"的设计意图。旧 setting 的负 bound 源于错误的 `Int` 约束强制 Y_i ≡ 0。
+
+**2. CCD/SCD/Bandit 不再从第 1 次迭代冻结 bound。**  
+原 EXP-008 中 CCD/SCD 在第 1 次迭代后 bound 完全不变（300 次零改善）。修复后所有 handler bound 均单调下降，说明 A/U/P 连续后 backward pass 能产生有效 cut。
+
+**3. 300 次迭代后 bound 仍未收敛（仍在缓慢下降）。**  
+与旧 EXP-008 不同，BoundStalling(30) 未触发，说明 cut 仍在持续改善，iter_limit 是瓶颈而非 cut 质量上限。各 handler bound 差异 < 2（50.85 vs 49.22），彼此接近。
+
+**4. bin+LD 出现异常：bound 从第 1 次迭代冻结在 8629（大 M 量级）。**  
+8629 ≈ `B_max × (R + C_p)` 量级，疑为 LP relaxation 初始 bound 极松（二进制展开 + LD 的 OA 子问题未正确收紧）。原因待查，可能是 `states_bin.jl` 修改后 binary state 与连续 A/U/P 混合导致 LD 的 Lagrangian relaxation 设定有误。
+
+#### 与原 EXP-008 对比
+
+| 维度 | EXP-008（旧 Int setting） | EXP-008b（修复后 new setting） |
+|---|---|---|
+| CCD/SCD 行为 | 1 次迭代后冻结，300 次零改善 | 单调下降，300 次未停滞 |
+| 最终 bound 量级 | -184 ~ -998（负值，Y_i≡0 退化） | ~50（正值，正确反映净收益） |
+| bin+LD | 33 次收敛至 -998 | 冻结在 8629，异常 |
+| 停止原因 | BoundStalling(30) | iteration_limit（均未触发 stall） |
+
+#### 后续
+
+- **bin+LD 异常需专项排查**：检查 `states_bin.jl` 修改后 LD 的 Lagrangian 子问题设定。
+- **增大 iter_limit 或改用 wall-time 限制**：当前 300 次仍不足以收敛，可考虑 iter=1000 或 time_limit=3600s。
+- **需与 EF（EXP-009 类）对比**：在新 setting 下求 deterministic equivalent 以获得 SAA 真实最优，评估 bound gap。
