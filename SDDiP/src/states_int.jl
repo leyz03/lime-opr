@@ -32,21 +32,24 @@ function declare_states_int!(sp::Model, p::BikeParams)
     N = p.N
 
     # ── Main state variables ──────────────────────────────────────────────────
-    @variable(sp, 0 <= A[j in N] <= p.B_max, Int, SDDP.State,
+    # A, U, P are CONTINUOUS aggregate fluid quantities:
+    #   their transitions involve fractional (1-φ) and ρ coefficients that would
+    #   otherwise force Y_i ≡ 0 via integer-compatibility (see analysis below).
+    # W, M, G remain integer — they only take integer increments (x, m_hat, G arrivals).
+    @variable(sp, 0 <= A[j in N] <= p.B_max, SDDP.State,
               initial_value = p.A0[j])
-    @variable(sp, 0 <= U[j in N] <= p.B_max, Int, SDDP.State,
+    @variable(sp, 0 <= U[j in N] <= p.B_max, SDDP.State,
               initial_value = p.U0[j])
     @variable(sp, 0 <= W[j in N] <= p.W_tot, Int, SDDP.State,
               initial_value = p.W0[j])
     @variable(sp, 0 <= M[j in N, k in N] <= p.M_max, Int, SDDP.State,
               initial_value = p.M0[j, k])
 
-    # ── Pipeline: bike in-transit P[i,j,r], r = remaining periods to arrival ──
-    # Declared only for t_ij[i,j] ≥ 2  (range 1:0 is silently empty in JuMP)
+    # ── Pipeline: bike in-transit P[i,j,r] (continuous: entry = Y_ij = ρ·Y_i) ─
     @variable(sp, 0 <= P[i in N, j in N, r in 1:(p.t_ij[i,j]-1)] <= p.B_max,
-              Int, SDDP.State, initial_value = 0)
+              SDDP.State, initial_value = 0)
 
-    # ── Pipeline: worker in-transit G[i,j,k,r], r = remaining periods to done ─
+    # ── Pipeline: worker in-transit G[i,j,k,r] (integer: entry = x) ───────────
     @variable(sp, 0 <= G[i in N, j in N, k in N, r in 1:(p.δ_ijk[i,j,k]-1)] <= p.W_tot,
               Int, SDDP.State, initial_value = 0)
 

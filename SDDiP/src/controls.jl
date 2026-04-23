@@ -50,11 +50,6 @@ function declare_controls!(sp::Model, p::BikeParams)
     # F_bar_j[j]: unavailable (damaged) bikes returning to j this period
     @variable(sp, 0 <= F_bar_j[j in N])
 
-    # ── min(A, D) linearization auxiliary ─────────────────────────────────────
-    # alpha_i[i] ∈ [0,1] — convex combination weight; maximization pushes
-    # Y_i to min(A_in, D_i) without explicit min() operator
-    @variable(sp, 0 <= alpha_i[i in N] <= 1)
-
     # ── Stable-matching binary indicators ────────────────────────────────────
     # delta_ijk[i,j,k]: 1 if task pool (j,k) is fully committed for worker i
     @variable(sp, delta_ijk[i in N, j in N, k in N], Bin)
@@ -85,7 +80,6 @@ function declare_controls!(sp::Model, p::BikeParams)
         L_i       = sp[:L_i],
         F_j       = sp[:F_j],
         F_bar_j   = sp[:F_bar_j],
-        alpha_i   = sp[:alpha_i],
         delta_ijk = sp[:delta_ijk],
         eta_ijk   = sp[:eta_ijk],
         zeta_i    = sp[:zeta_i],

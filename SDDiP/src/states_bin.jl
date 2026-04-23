@@ -45,44 +45,43 @@ end
 """
     declare_states_bin!(sp, p) -> NamedTuple
 
-Binary-expand all integer state variables and return the unified state
-interface (AffExpr values) consumed by constraints.jl.
+Binary-expand the *integer* states (W, M, G) only.
+
+A, U, P are aggregate fluid quantities with fractional (ρ, 1-φ) coefficients
+in their transitions — binary-expanding them would re-introduce the
+integer-compatibility trap that forces Y_i ≡ 0 (same bug as `Int` in states_int).
+So A, U, P stay continuous here, identical to states_int; only the true
+integer states are binary-encoded.
+
+Zou et al. (2019) tight-cut guarantee applies only to the binary portion;
+the continuous portion uses standard (non-tight) SDDP cuts.
 """
 function declare_states_bin!(sp::Model, p::BikeParams)
     N  = p.N
-    κA = _n_bits(p.B_max)   # bits for A, U, P  (bounded by B_max)
-    κW = _n_bits(p.W_tot)   # bits for W, G      (bounded by W_tot)
+    κW = _n_bits(p.W_tot)   # bits for W, G
     κM = _n_bits(p.M_max)   # bits for M
 
-    # ── A: binary expansion ───────────────────────────────────────────────────
-    @variable(sp, λA[j in N, l in 1:κA], Bin, SDDP.State,
-              initial_value = _digit_bit(p.A0[j], l))
+    # ── Continuous aggregate states (same as states_int.jl) ──────────────────
+    @variable(sp, 0 <= A[j in N] <= p.B_max, SDDP.State,
+              initial_value = p.A0[j])
+    @variable(sp, 0 <= U[j in N] <= p.B_max, SDDP.State,
+              initial_value = p.U0[j])
+    @variable(sp, 0 <= P[i in N, j in N, r in 1:(p.t_ij[i,j]-1)] <= p.B_max,
+              SDDP.State, initial_value = 0)
 
-    # ── U ─────────────────────────────────────────────────────────────────────
-    @variable(sp, λU[j in N, l in 1:κA], Bin, SDDP.State,
-              initial_value = _digit_bit(p.U0[j], l))
-
-    # ── W ─────────────────────────────────────────────────────────────────────
+    # ── Binary-expanded integer states ───────────────────────────────────────
     @variable(sp, λW[j in N, l in 1:κW], Bin, SDDP.State,
               initial_value = _digit_bit(p.W0[j], l))
-
-    # ── M ─────────────────────────────────────────────────────────────────────
     @variable(sp, λM[j in N, k in N, l in 1:κM], Bin, SDDP.State,
               initial_value = _digit_bit(p.M0[j, k], l))
-
-    # ── P pipeline (only for t_ij ≥ 2) ───────────────────────────────────────
-    @variable(sp, λP[i in N, j in N, r in 1:(p.t_ij[i,j]-1), l in 1:κA],
-              Bin, SDDP.State, initial_value = 0)
-
-    # ── G pipeline (only for δ_ijk ≥ 2) ──────────────────────────────────────
     @variable(sp, λG[i in N, j in N, k in N, r in 1:(p.δ_ijk[i,j,k]-1), l in 1:κW],
               Bin, SDDP.State, initial_value = 0)
 
-    # ── Build unified AffExpr interface ──────────────────────────────────────
-    A_in  = [_binary_sum(sp[:λA][j, l].in  for l in 1:κA) for j in N]
-    A_out = [_binary_sum(sp[:λA][j, l].out for l in 1:κA) for j in N]
-    U_in  = [_binary_sum(sp[:λU][j, l].in  for l in 1:κA) for j in N]
-    U_out = [_binary_sum(sp[:λU][j, l].out for l in 1:κA) for j in N]
+    # ── Unified interface ────────────────────────────────────────────────────
+    A_in  = [sp[:A][j].in  for j in N]
+    A_out = [sp[:A][j].out for j in N]
+    U_in  = [sp[:U][j].in  for j in N]
+    U_out = [sp[:U][j].out for j in N]
     W_in  = [_binary_sum(sp[:λW][j, l].in  for l in 1:κW) for j in N]
     W_out = [_binary_sum(sp[:λW][j, l].out for l in 1:κW) for j in N]
     M_in  = [_binary_sum(sp[:λM][j, k, l].in  for l in 1:κM) for j in N, k in N]
@@ -93,14 +92,8 @@ function declare_states_bin!(sp::Model, p::BikeParams)
     G_idx = NTuple{4,Int}[(i, j, k, r)
                           for i in N for j in N for k in N for r in 1:(p.δ_ijk[i,j,k]-1)]
 
-    P_in  = Dict(
-        (i,j,r) => _binary_sum(sp[:λP][i,j,r,l].in  for l in 1:κA)
-        for (i,j,r) in P_idx
-    )
-    P_out = Dict(
-        (i,j,r) => _binary_sum(sp[:λP][i,j,r,l].out for l in 1:κA)
-        for (i,j,r) in P_idx
-    )
+    P_in  = Dict(idx => sp[:P][idx...].in  for idx in P_idx)
+    P_out = Dict(idx => sp[:P][idx...].out for idx in P_idx)
     G_in  = Dict(
         (i,j,k,r) => _binary_sum(sp[:λG][i,j,k,r,l].in  for l in 1:κW)
         for (i,j,k,r) in G_idx
