@@ -4,7 +4,8 @@
 \usepackage[utf8]{inputenc}
 \usepackage[ruled,vlined,linesnumbered]{algorithm2e}
 \usepackage{verbatim}
-
+\newcommand{\manxi}[1]{{\color{blue}[Manxi: #1]}}
+\newcommand{\response}[1]{{\color{blue}[#1]}}
 \usepackage[colorlinks=true,allcolors=blue]{hyperref}
 
 \usepackage[
@@ -56,11 +57,6 @@
     \[
       L_{i}^t = D_i^t - Y_i^t
     \]
-    The total lost demand in a decision epoch which needs to be penalized is
-    \[
-    L^t = \sum_{i\in N} L_i^t
-    \]
-
     \item $R_{ij}$ is the revenue platform gets from customer trip $ij$, $C_p$ is the penalty for unsatisfied demand.
     
     \item A bike becomes unavailable after trip $ij$ with probability $\phi_{ij}$
@@ -87,26 +83,11 @@
      \item Number of workers available in station $i$ at epoch $t$: $W_i^t$; These workers add up to $W$
      \item Number of swap jobs being chosen at station $i$ at time $t$:  $\tilde{s}_i^t$; Number of moving jobs being chosen from $i$ to $j$: $\tilde{m}_{ij}^t$
 
-     \item The workers' flow due to task allocation is $x_{ijk}^t$, which denotes the number of workers who starts from $i$, goes to $j$ for working and ends up in $k$, and $x_{i,idle}$ for worker idle at $i$.
-
-    \item Task Allocation Problem As Stable Matching
-
-    We model a stable matching problem between $|\mathcal{W}^t|$ workers and $|\mathcal{M}^t|$ task trips
-    
-    \begin{itemize}
-    \item Let $\mathcal{W}^t$ be the set of workers available at epoch $t$. 
-        Each worker $w\in\mathcal{W}^t$ is located at some region $\ell(w) \in N$
-        
-        \item The set of task types at epoch $t$ is
-        \[
-            \mathcal{M}^t = \{(i,j, M_{ij}^t): i,j \in N \} 
-        \]
-        and we interpret $M_{ij}^t$ as the capacity (the number of identical slots) of task trip $(i,j)$; for a task $m = (i,j,M_{ij}^t)\in \mathcal{M}^t$, $o(m)=i$, $d(m)=j$, $q_m=M_{ij}^t$.
-    \end{itemize}
+     \item The workers' flow due to task allocation is $x_{ijk}^t$, which denotes the number of workers who starts from $i$, goes to $j$ for working and ends up in $k$;
 
     \item Task payments and worker net profit:
     \begin{itemize}
-        \item A worker $w$ located at $\ell(w)$ who undertakes a task $m \in \mathcal{M}^t$, which starts from $i$ and ends at $j$, first travels from $\ell(w)$ to $i$ and then executes the task from $i$ to $j$.
+        \item A worker $w$ located at $\ell(w)$ who undertakes a task $m$, which starts from $i$ and ends at $j$, first travels from $\ell(w)$ to $i$ and then executes the task from $i$ to $j$.
         The corresponding net profit for worker $w$ is
         \[
             \mathcal{P}_w^t(i,j) = p_{ij} - d_{\ell(w),\,i} - c_{ij},
@@ -115,79 +96,26 @@
         \item We assume that workers have an outside option of remaining idle with profit $0$, and they regard any task trip $(i,j)$ with $\mathcal{P}_w^t(i,j)  < 0$ as unacceptable.
     \end{itemize}
 
+    \item Task Allocation Problem As Stable Matching
 
-     \item We think of workers as greedy: when they are available, they choose the job with highest profit that they can get. A job is obtained by the nearest available worker. 
-     
-     \begin{itemize}
-         \item Each worker $w\in \mathcal{W}^t$ has a preference among all task trips:
-         \[
-         \Pi(w):\pi_1(w)\succ \pi_2(w)\succ\dots\succ \pi_{N^2}(w)
-         \]
-         where each element $\pi_k(w)\in \mathcal{M}^t$
-         \item Each task trip $m=(i,j,M_{ij}^t)$ has a preference among all workers:
-         \[
-         \Pi(m):\pi_1(m)\succ\pi_2(m)\succ \dots \succ \pi_W(m)
-         \]
-        \item $\mu$ is a two-side pairing function for both task trip and worker
+    \begin{itemize}
+    \item We model a stable matching problem between workers from worker set $\mathcal{W}^t$ and task trips from task set $\mathcal{M}^t$
+    
+    \item We think of workers as greedy: when they are available, they choose the job with highest profit that they can get. A job is obtained by the nearest available worker.
     \end{itemize}
     
-    Aggregate the stable matching to the flow of workers
-    $x_{ijk}^t$ for all $i,j,k\in N$
-
-     The algorithm guarantees termination within $\mathcal{O}$($\left |\mathcal{W}^t\right|\times \left |\mathcal{M}^t\right|$) proposals; 
+\begin{comment}
+    The algorithm guarantees termination within $\mathcal{O}$($\left |\mathcal{W}^t\right|\times \left |\mathcal{M}^t\right|$) proposals; 
     
     The algorithm guarantees Pareto Optimality along workers within all stable matching\parencite{gale1962college}
 
     % {\color{red}The algorithm shown above is equivalent to solving the following Integer Programming \parencite{agoston2016integer}:
-
-    % \begin{equation}
-    % \begin{aligned}
-    % \min_{x_{wm},t_m,f_m}\quad 
-    % & \sum_{m\in \mathcal{M}^t} t_m \\[4pt]
-    % \text{s.t.}\quad
-    % & \sum_{m:(w,m)\in E} x_{w,m} = 1,
-    % && \forall w\in \mathcal{W}^t, \\[6pt]
-    % & \sum_{w:(w,m)\in E} x_{w,m} \le M(m),
-    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[10pt]
-    % & t_m \le (1-x_{w,m})(\bar s+1)+s_{w,m},
-    % && \forall (w,m)\in E, \\[8pt]
-    % & s_{w,m}+1 \le
-    % t_m + \Big(\sum_{m':(w,m')\in E,\; r_{w,m'}\le r_{w,m}} x_{w,m'}\Big)(\bar s+1),
-    % && \forall (w,m)\in E, \\[10pt]
-    % & f_m\,M(m) \le \sum_{w:(w,m)\in E} x_{w,m},
-    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[8pt]
-    % & t_m \le f_m(\bar s+1),
-    % && \forall m\in \mathcal{M}^t\cup\{m_0\}, \\[8pt]
-    % & s_{w,m} = -d_{\ell_w,o(m)} && \forall (w,m)\in E\\[8pt]
-    % &\text{may define above }\bar s \geq  s_{w,m} && \forall (w,m)\in E\\[8pt]
-    % & x_{w,m}\in\{0,1\},\quad
-    % f_m\in\{0,1\},\quad
-    % t_m\in\{0,1,\dots,\bar s+1\},
-    % && \forall (w,m)\in E.
-    % \end{aligned}
-    % \label{inner_layer}
-    % \end{equation}
-
-    % where $x_{w,m}$ means whether to worker $w$ is picking job $m$, $t_m$ is the "score-limit" for workers to apply for job $m$, and $f_m$ is an indicator of whether job $m$ is open,  $r_{w,m} = \textbf{rank of job m in worker w's preference}$
-    % }
- 
-     % \item An alternative modeling for task allocation:
-     
-     % $D_{ij}^t$ tracks job trip capacity from $i$ to $j$, if $i=j$, this job is a swap job, otherwise it is a move job
-     % \begin{align*}
-     %     \textbf{max} & \sum_{i,j,k\in N} x^t_{ijk} (p_{jk} - c_{ij} - c_{jk})\\
-     %     \textbf{s.t.} & \sum_{j,k\in N} x^t_{ijk} \leq W_i^t & \forall i\in N\\
-     %     & \sum_{i\in N} x_{ijk}^t \leq D_{jk}^t& \forall j,k\in N\\
-     %     & x_{ijk}\geq 0\\
-     %     & x_{ijk}\in \mathbb{Z}
-     % \end{align*}
-     % where $x_{ijk}$ is the number of workers who start from $i$, go to $j$ to seek job, and end will end their job at $k$
-
+\end{comment}
      \item Platform chooses:
 
 \begin{itemize}
-    \item Contract prices $p_{ij}$, where $i,j\in N$
-    \item Task generation policy $\hat{m}_{ij}^t$ 
+    \item Contract prices $p_{ij}$, where $i,j\in \mathcal{N}$
+    \item Task posting policy $\hat{m}_{ij}^t$ 
     
     % (mapping task state $\mathcal{S}$, bike state $A_i^t$, $U_i^t$) 
     %\[
@@ -201,37 +129,37 @@
 
 \newpage
 
-\item Problem Formulation
+\item Problem Formulation 
+\begin{subequations}
 \begin{align}
     \textbf{objective:}\nonumber\\
     \mathbf{\max} \quad
     &\mathbb{E}\left[
     \sum_{t=1}^{T}
     \left(
-    \sum_{i\in N} \big( \sum_{j\in N}R_{ij}\, Y_{ij}^t - C_p\, L_{i}^t \big)
-    - \sum_{(i,j)\in N\times N} p_{ij}\, \tilde{m}_{ij}^t
+    \sum_{i\in \mathcal{N}} \big( \sum_{j\in \mathcal{N}}R_{ij}\, Y_{ij}^t - C_p\, L_{i}^t \big)
+    - {\color{red}\sum_{j,k\in \mathcal{N}} p_{jk}\, \tilde{m}_{jk}^t}
     \right)
-    \right]\\[4pt]
+    \right] \label{obj}\\[4pt]
     \textbf{subject to:}\nonumber\\
-    & Y_i^t \leq A_{i}^t & \forall i\in \mathcal{N},  t\in [T]\\[4pt]
-    &  Y_i^t \leq D_{i}^t & \forall i\in \mathcal{N}; t\in [T]\\[4pt]
-    & Y_i^t \geq  \alpha A_{i}^t + (1-\alpha)  D_{i}^t& \forall i\in \mathcal{N}; t\in [T]\\[4pt]
-    & \alpha \leq 1 \\
-    & Y_{ij}^t = Y_i^t \times {\frac{D_{ij}^t}{D_i^t}}   &\forall i,j \in \mathcal{N}; t \in [T] \\[4pt]
-    & L_{i}^t = D_i^t - Y_i^t &\forall i \in \mathcal{N}; t \in [T] \\[4pt]
-    & L^t = \sum_{i\in \mathcal{N}} L_i^t &\forall t \in [T] \\[4pt]
-    & F_j^t = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}}(1-\phi_{ij}) &\forall  j \in \mathcal{N};t \in [T] \\[4pt] 
+    & {\color{red} Y_i^t \leq A_{i}^t} & \forall i\in \mathcal{N}, t\in [T] \label{min(A,D)start}\\[4pt]
+    & {\color{red} Y_i^t \leq D_{i}^t} & \forall i\in \mathcal{N}; t\in [T]\\[4pt]
+    & {\color{red}Y_i^t \geq  \alpha_i A_{i}^t + (1-\alpha_i)  D_{i}^t} & \forall i\in \mathcal{N}; t\in [T] \label{min(A,D)}\\[4pt]
+    & {\color{red} \alpha_i \leq 1} & \forall i\in \mathcal{N} \\
+    & Y_{ij}^t = Y_i^t \times {\frac{D_{ij}^t}{D_i^t}}   &\forall i,j \in \mathcal{N}; t \in [T] \label{OrderFlow}\\[4pt]
+    & L_{i}^t = D_i^t - Y_i^t &\forall i \in \mathcal{N}; t \in [T] \label{OrderLoss}\\[4pt]
+    & F_j^t = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}}(1-\phi_{ij}) &\forall  j \in \mathcal{N};t \in [T] \label{ReturningAvailable}\\[4pt] 
     %%%%% above is constraint 51 %%%%%
-    & \bar{F_{j}^t} = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}} \phi_{ij} &\forall j \in \mathcal{N};t \in [T] \\[4pt]
-    & \hat{m}_{jj}^t\leq U_j^t + \bar{F}_j^t &\forall  j \in \mathcal{N};t \in [T] \\[4pt]
-    & \hat{m}_{ij}^t\le A_i^t - Y_i^t &\forall  i,j \in \mathcal{N},i\neq j; t \in [T] \\[4pt]
+    & \bar{F_{j}^t} = \sum_{i \in \mathcal{N}} Y_{ij}^{t- c_{ij}} \phi_{ij} &\forall j \in \mathcal{N};t \in [T] \label{ReturningUnavailable}\\[4pt]
+    & \hat{m}_{jj}^t\leq U_j^t + \bar{F}_j^t &\forall  j \in \mathcal{N};t \in [T] \label{SwapConstraint}\\[4pt]
+    & \hat{m}_{ij}^t\le A_i^t - Y_i^t &\forall  i,j \in \mathcal{N},i\neq j; t \in [T] \label{MoveConstraint}\\[4pt]
     &A_j^{t+1}
             = A_j^{t}
             - Y_j^{t} % Realized services
             + F_j^{t} % Returning bike that is not battery dead (Services completed)
             - \sum_{k\in \mathcal{N}\setminus \{j\} } \hat{m}_{jk}^{t} % Tasks posted except for swap task, since swap task is tracked by F_j
             + \sum_{i,k\in \mathcal{N}} x_{ikj}^{t-d_{ik}-c_{kj}} % all tasks that is to be finished at time t
-            &\quad \forall j \in \mathcal{N};\;t\in[T]\\[4pt]
+            &\quad \forall j \in \mathcal{N};\;t\in[T]\label{FlowTransition}\\[4pt]
     &U_j^{t+1} % Only counts battery failure
         = U_j^{t}
         + \bar{F}_j^{t} % Returning dead bikes
@@ -249,125 +177,507 @@
         & \quad \forall i,j\in \mathcal{N};\; t\in[T]\\[4pt]
     &\tilde{m}_{jk}^t 
         = \sum_{i\in \mathcal{N}} x_{ijk}^t,
-        &\quad \forall j,k\in \mathcal{N};\; t\in[T]\\[4pt]
-    &0 \leq \tilde{m}_{jk}^{t} \leq M_{jk}^{t},
-        &\quad \forall j,k\in \mathcal{N}; t\in [T]
+        &\quad \forall j,k\in \mathcal{N};\; t\in[T]\label{tilde m def}\\[4pt]
+    &\tilde{m}_{jk}^{t} \leq M_{jk}^{t}, &\quad \forall j,k\in \mathcal{N}; t\in [T]\label{PostConstraint}\\
+    & \sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} \geq {\color{red}\delta_{ijk}^t \, M_{jk}^t}, &\forall i,j,k\in \mathcal{N},t\in [T] \label{deltaM}\\
+    & x_{ijk}^t \le Q_1 \,\eta_{ijk}^t & \forall i,j,k\in \mathcal{N},t\in [T] \label{Qeta}\\
+    & p_{jk} - d_{ij} - c_{jk} \ge s_i^t - Q_2\,(1-\eta^t_{ijk}) & \forall i,j,k\in \mathcal{N},t\in[T] \label{si as lower bound}\\
+    & \sum_{j,k\in\mathcal{N}}x^t_{ijk} \ge W_i^t - Q_1 (1-\zeta_i^t) 
+    & \forall i\in\mathcal{N},t\in[t]\label{is there lazy worker}\\
+    & s_i^t \le  \zeta_i^t Q_2 & \forall i\in\mathcal{N}, t\in[T] \label{stability end}\\
+    &s_i^t \ge p_{jk} - d_{ij} - c_{jk} - \delta_{ijk}^t\,Q_2 & \forall i,j,k\in \mathcal{N},t\in [T]\label{si bigger if not full}\\
+    & p_{ij},\,
+    Y_i^t,\,
+    A_i^t,\,
+    Y_{ij}^t,\,
+    L_i^t,\,
+    F_j^t,\,
+    \bar{F}_j^t,\,
+    U_i^t,\,
+    W_i^t,\,
+    M_{jk}^t,\,
+    \tilde{m}_{jk}^t,\,
+    s_i
+    \ge 0 & \nonumber\\[4pt]
+    &x_{ijk}^t, \hat{m}_{ij}^t\in \mathbb{N},\,
+    \delta_{ijk}^t,\,
+    \zeta_i^t,\,
+    \eta_{ijk}^t,\,
+    \in \{0,1\}, \,
+    & \quad \forall i,j,k\in \mathcal{N}; t\in [T]
 \end{align}
+\end{subequations}
+\end{itemize}
 
+
+\section{Reformulation and Solving}
+
+\subsection{Dealing with bilinear terms}
+
+\begin{itemize} 
+    \item $ p_{ij}\ \tilde{m}_{ij}^t$ in objective function with continuous variable product with integer variable. Modern commercial solvers such as Gurobi can now efficiently handle non-convex bilinear optimization problems. They achieve global optimality by leveraging advanced techniques, most notably McCormick envelope relaxations integrated within a spatial branch-and-bound framework.\citep{gurobi_manual_current, gurobi_miqcp_2020}
+    \item $\alpha A_{i}^t$ in equation \eqref{min(A,D)start} to \eqref{min(A,D)}:
+    
+    Use Big-M reformulation instead of linear combination \citep{glover1975improved}, which will help us get rid of bilinear term:
+\begin{subequations}
+    \begin{align}
+    & Y_i^t \leq A_{i}^t & \forall i\in \mathcal{N},  t\in [T]\label{2a}\\[4pt]
+    &  Y_i^t \leq D_{i}^t & \forall i\in \mathcal{N}; t\in [T]\\[4pt]
+    & Y_i^t \geq  A_i^t - Q_3 (1-\beta_i^t) & \forall i\in \mathcal{N},t\in [T]\\
+    & Y_i^t \geq  D_i^t - Q_3 \beta_i^t & \forall i\in \mathcal{N},t\in [T]\\
+    & \beta_i^t \in \{0,1\} & \forall i\in \mathcal{N}, t\in [T]\label{2e}
+    \end{align}
+\end{subequations}
+    \item $\delta_{ijk}^tM_{jk}^t$ in equation (\ref{deltaM}):
+    
+   We introduce a new variable $v_{ijk}^t$ to substitute the bilinear term $\delta_{ijk}^tM_{jk}^t$ and use similar method as above, \eqref{deltaM} is equivalent to the following constraints:
+\begin{subequations}
+    \begin{align}
+         v_{ijk}^t&\leq \sum_{i':d_{i'j}\leq d_{ij}}x_{i'jk}^t &\forall i,j,k\in \mathcal{N}; t\in [T] \label{3a}\\
+        v_{ijk}^t &\leq M_{jk}^t &\forall i,j,k\in \mathcal{N}; t\in [T] \\
+        v_{ijk}^t &\leq Q_3 \cdot \delta_{ijk}^t &\forall i,j,k\in \mathcal{N}; t\in [T] \\
+        v_{ijk}^t &\geq M_{jk}^t - Q_3 \cdot (1 - \delta_{ijk}^t) &\forall i,j,k\in \mathcal{N}; t\in [T] \\
+        v_{ijk}^t &\geq 0 &\forall i,j,k\in \mathcal{N}; t\in [T]\label{3e}
+    \end{align}
+\end{subequations}
+    \item $Q_1$, $Q_2$ and $Q_3$ are big numbers, $Q_1$ is the number of workers, $Q_2$ is a upper bound of net reward for a worker, and $Q_3$ is the number of bikes. That is
+    \begin{align*}
+        Q_1 & =|\mathcal{W}^0|\\
+        Q_2 & = \max_{jk}\{p_{jk}\}\\
+        Q_3 & =\sum_{i\in \mathcal{N}}(A^0_i+U^0_i)
+    \end{align*}
+\end{itemize}
+
+
+The Problem is then equivalent to 
+\begin{align*}
+    \mathbf{\max} \quad
+    &\eqref{obj}\\[4pt]
+    \text{s.t.} \quad & \eqref{OrderFlow}-\eqref{PostConstraint}, \eqref{Qeta}-\eqref{stability end}\\
+    & \eqref{2a}-\eqref{2e}\\
+    & \eqref{3a}-\eqref{3e}\\
+    & p_{ij},\,
+    Y_i^t,\,
+    A_i^t,\,
+    Y_{ij}^t,\,
+    L_i^t,\,
+    F_j^t,\,
+    \bar{F}_j^t,\,
+    U_i^t,\,
+    W_i^t,\,
+    M_{jk}^t,\,
+    \tilde{m}_{jk}^t,\,
+    s_i,\,
+    v_{ijk}^t
+    \ge 0 & \nonumber\\[4pt]
+    &x_{ijk}^t, \hat{m}_{ij}^t\in \mathbb{N},\,
+    \delta_{ijk}^t,\,
+    \zeta_i^t,\,
+    \eta_{ijk}^t,\,
+    \beta_i^t\,
+    \in \{0,1\}, \,
+    & \quad \forall i,j,k\in \mathcal{N}; t\in [T]
+\end{align*}
+
+\subsection{Equivalence to stability constraints}
+
+Slightly different with the definition of stability in  \citep{baiou2000stable}, we define matching and blocking pairs and stability in our problem as follows:
+
+\paragraph{Definition of Matching}: At time $t$, given a locations set $\mathcal{N}^t$ (with the workers $\mathcal{W}^t$ located on these nodes, and $W_i^t>0$ workers at all nodes $i$) and a jobs set $\mathcal{M}^t$, a matching is defined as an array $X^t = \{x_{ijk}^t\}_{i\in \mathcal{N}^t,jk\in \mathcal{M}^t}$, where $x_{ijk}^t$ denotes the number of workers from location $i$ assigned to job $jk$. The induced matching correspondence $\mu^t$ is defined as
+\begin{align*}
+    & \mu^t(i) = \{jk \in \mathcal{M}^t \mid x_{ijk}^t > 0\} \quad \forall i\in \mathcal{N}^t, \\
+    & \mu^t(jk) = \{i \in \mathcal{N}^t \mid x^t_{ijk} > 0\} \quad \forall jk\in \mathcal{M}^t.
+\end{align*}
+
+Given a matching defined by $\mu^t$, we define $\hat{s}^t_i$ to be the lowest reward that a worker at $i$ get in the matching, that is,
 \begin{align}
-    & \sum_{i,j,k\in \mathcal{N}} y_{wijk}^t\le 1, &\quad \forall w\in \mathcal{W};t\in [T]\\[4pt]
-    & \sum_{\substack{{w\in \mathcal{W}}\\{i\in \mathcal{N}}}} y_{wijk}^t \le M_{jk}^t, & \quad \forall j,k\in \mathcal{N};t\in [T]\\[4pt]
-    & \sum_{j,k\in \mathcal{N}} y_{wijk}^t \le \ell_{wi}^t, & \quad \forall w\in \mathcal{W}, \forall i\in\mathcal{N};t\in [T]\\[4pt]
-    & \ell_{wi}^{t+1} = \ell_{wi}^t - \sum_{j,k\in \mathcal{N}} y_{wijk}^t + \sum_{g,h\in \mathcal{N}} y_{wghi}^{t-1-d_{gh}-c_{hi}}, & \quad \forall w\in \mathcal{W},i\in \mathcal{N};t\in [T]\\[4pt]
-    & u_{wi}^t = \sum_{j,k\in \mathcal{N}} y_{wijk}^t \left( p_{jk} - d_{ij} - c_{jk} \right), & \quad \forall w\in \mathcal{W}, i\in \mathcal{N};t\in [T]\\[4pt]
-    & u_{wi}^t \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t - \delta_{wijk}^t \, Q, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
-    & \sum_{\substack{{w'\in \mathcal{W}}\\{i':d_{i'j}< d_{ij}}}} y^t_{w'i'jk} \geq \delta_{wijk}^t \, M_{jk}^t, & \quad \forall w\in \mathcal{W}, i,j,k\in \mathcal{N}; t\in [T]\\[4pt]
-    & x_{ijk}^t = \sum_{w\in \mathcal{W}} y_{wijk}^t, & \quad \forall i,j,k\in \mathcal{N};t\in [T]\\[4pt]
-    & \hat{m}_{ij}^t \ge 0,\,
-    p_{ij} \geq 0,\,
-    Y_i^t \geq 0,\,
-    A_i^t \geq 0,\,
-    Y_{ij}^t \geq 0,\,
-    L_i^t \geq 0,\,
-    L_t \ge 0, & \nonumber\\[4pt]
-    & F_j^t \ge 0,\,
-    \bar{F}_j^t \ge 0,\,
-    U_i^t \geq 0,\,
-    x_{ijk}^t \ge 0,\,
-    W_i^t \ge 0,\,
-    M_{jk}^t \ge 0,\,
-    \tilde{m}_{jk}^t \ge 0 & \nonumber\\[4pt]
-    & y_{wijk}^t\in \{0,1\}, \,
-    \ell_{wi}^t \in \{0,1\},\,
-    u_{wi}^t\ge 0,\,
-    \delta_{wijk}^t\in \{0,1\}, \,
-    \alpha \ge 0, 
-    & \quad \forall i,j,k\in \mathcal{N}; t\in [T]; w\in \mathcal{W}
+    \hat{s}_i^t =
+    \begin{cases}
+    \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right) & \sum_{jk}x_{ijk}^t = W_i^t,\\
+    \min \left\{\min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right),0\right\} & \text{o.w.},
+    \end{cases}
+    \quad \forall i\in \mathcal{N}^t \label{definition s hat}.
 \end{align}
 
-where $y_{wijk}^t$ denotes whether worker $w$ departs from $i$, pick up job at $j$ and end up at $k$, $l_{wi}^t$ denotes the availability of worker $w$ at node $i$, $\delta_{wijk}^t$ denotes whether job $jk$ is full with worker better-equal than worker $w$ who is currently at $i$, $u_{wi}^t$ denotes the true profit of a worker in a matching.
+\paragraph{Definition of Blocking Pair:} A pair of a worker location $i$ and a job $jk$ at time $t$ is a \textit{blocking pair} if both of the following conditions hold simultaneously:
+\begin{enumerate}
+    \item \textbf{Worker-side incentive to deviate:} There exists at least one worker at location $i$ who strictly prefers job $jk$ over their current assignment (or their unemployment state). 
+    
+    Because workers at location $i$ are homogeneous, this implies that the minimum realized utility among all workers at $i$, $\hat{s}_i^t$, is strictly less than the utility provided by job $jk$:
+    \begin{equation*}
+        \hat{s}_i^t < p_{jk} - d_{ij} - c_{jk}.
+    \end{equation*}
 
-Constraint (25) denotes that if a worker does not go to a vacant job $jk$, then its true profit must be bigger than the true profit of doing $jk$; if a worker does nothing, then either he/she is unavailable, or all positive-profit jobs are full.
+    \item \textbf{Job-side incentive to deviate:} Job $jk$ either has unfilled capacity, or it has accepted workers from locations strictly worse (i.e., farther) than $i$. Mathematically, this requires:
+    \begin{equation*}
+        \sum_{i': d_{i'j} \le d_{ij}} x_{i'jk}^t < M_{jk}^t.
+    \end{equation*}
+\end{enumerate}
 
-Constraint (26) denotes that if $\delta_{wijk}^t=1$, then job $jk$ is full with worker better-equal than worker $w$ who is currently at $i$.
+\paragraph{Definition of Stability:} A matching given by the aggregate flow $x_{ijk}^t$ is \textbf{stable} if and only if no such blocking pair $(i,jk)$ exists in the network, i.e., the two "blocking pair conditions" do not hold simultaneously. 
 
-\begin{lemma}
-    Any feasible matching given by constraints (20)-(26) is a stable matching.
+Now we show that mathematically, the definition above is equivalent to satisfying the constraints in the model.
+
+\begin{lemma}[Equivalence of Stability and Reformulation]
+    A matching given by the aggregate flow $x_{ijk}^t$ is stable if and only if there exist auxiliary variables $(\delta_{ijk}^t, \eta_{ijk}^t, \zeta_i^t, s_i^t)$ such that the set of constraints in the model is satisfied.
 \end{lemma}
 
-To prove this, we need to prove that any feasible matching will satisfy the constraints (30)-(32)\cite{baiou2000stable} below:
+\paragraph{Necessity}: We first show that given a stable matching $X=\left\{x_{ijk}^t\right\}_{i\in\mathcal{N}^t,jk\in \mathcal{M}^t}$, whose induced correspondence is $\mu$, we can construct auxiliary variables $\delta_{ijk}^t$, $\eta_{ijk}^t$, $\zeta_i^t$ and $s_i^t$, such that the decision variables $\left\{x_{ijk}^t,\delta_{ijk}^t, \eta_{ijk}^t, \zeta_i^t, s_i^t\right\}$ satisfy the constraints.
+
+We construct the auxiliary variables for all $i,j,k$ as follows:
+\begin{align*}
+    & \delta_{ijk}^t = \begin{cases}
+        1 & \sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} = M_{jk}^t\\
+        0 & \text{o.w.}
+    \end{cases}\\
+    & \eta_{ijk}^t = \begin{cases}
+        1 & x_{ijk}^t > 0\\
+        0 & \text{o.w.}
+    \end{cases}\\
+    & \zeta_i^t = \begin{cases}
+        1 & \sum_{jk\in \mathcal{M}^t}x_{ijk}^t=W_i^t\\
+        0 & \text{o.w.}
+    \end{cases}\\
+    & s_i^t = \hat{s}_i^t,
+\end{align*}
+and check whether the constraints are satisfied.
 \begin{itemize}
-    \item Constraint (30):
-    Since that the available jobs set $\mathcal{M}^t$ is a subset of the set of all jobs $\mathcal{M}$, we have
+    \item \eqref{deltaM}: By our construction of $\delta_{ijk}^t$, either of the following two cases holds: 
+    if $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} = M_{jk}^t$ and we construct $\delta_{ijk}^t=1$, thus \eqref{deltaM} becomes $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} \geq M_{jk}^t$ and holds; 
+    if $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} < M_{jk}^t$ and we construct $\delta_{ijk}^t=0$, thus \eqref{deltaM} becomes $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} \geq 0$ and holds;
+    \item \eqref{Qeta}: By our construction of $\eta_{ijk}^t$, either of the following two cases holds: 
+    if $x_{ijk}^t=0$ and we construct $\eta_{ijk}^t=0$, thus \eqref{Qeta} becomes $x_{ijk}^t\leq 0$ and holds; 
+    if $x_{ijk}^t>0$ and we construct $\eta_{ijk}^t=1$, thus \eqref{Qeta} becomes $x_{ijk}^t \leq Q_1$ ($Q_1$ is a big number) and holds;
+    \item \eqref{si as lower bound}: By our construction
     \begin{align*}
-    & \sum_{jk\in \mathcal{M}^t}\sum_{i\in \mathcal{N}}y_{wijk}^t \le \sum_{jk\in \mathcal{M}}\sum_{i\in \mathcal{N}}y_{wijk}^t \le 1 & \forall w\in \mathcal{W}
-    \end{align*}
-    which directly implies constraint (30);
-    
-    \item Constraint (31):
-    Since that the available workers set $\mathcal{W}^t$ is a subset of the set of all jobs $\mathcal{W}$, we have
-    \begin{align*}
-    & \sum_{w\in \mathcal{W}^t}\sum_{i\in \mathcal{N}}y_{wijk}^t \le \sum_{w\in \mathcal{W}}\sum_{i\in \mathcal{N}}y_{wijk}^t \le M^t_{jk} & \forall jk\in \mathcal{M}
-    \end{align*}
-    which directly implies constraint (31);
-    
-    \item Constraint (32):
-    Instead of constraint (32), we try to prove a stronger proposition:
-    \begin{align*}
-        M_{jk}^t \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'j'k'}^t) \le \sum_{w'\in T}\, \sum_{i'\in \mathcal{N}}y_{w'i'jk}^t && \forall w\in \mathcal{W},jk\in \mathcal{M}
-    \end{align*}
-    where $S$ is the set of jobs that are \textbf{better or equal} than job $jk$ for worker $w$ at $i$, and $T$ is the set of workers that are \textbf{strictly better} than worker $w$ at $i$ for job $jk$. Both sets $S$ and $T$ are determined by $w$ the worker, $i$ the location of the worker, and $jk$ the job.
+        s_i^t = \begin{cases}
+    \min_{jk\in \mu(i)} \left(p_{jk}-d_{ij}-c_{jk}\right) & \sum_{jk}x_{ijk} = W_i,\\
+    \min \left\{\min_{jk\in \mu(i)} \left(p_{jk}-d_{ij}-c_{jk}\right),0\right\} & \text{o.w.},
+    \end{cases}
+    \quad \forall i\in \mathcal{N}.
+    \end{align*} Either of the following two cases holds: 
+    if $x_{ijk}^t >0$, we construct $\eta_{ijk}^t=1$ which implies that $jk\in \mu(i)$, \eqref{si as lower bound} becomes $s_i^t\leq p_{jk}-d_{ij}-c_{jk}$ and holds by our construction of $s_i^t$; 
+    if $x_{ijk}^t =0$, we construct $\eta_{ijk}^t=0$ which implies that $jk\notin \mu(i)$, \eqref{si as lower bound} becomes $s_i^t\leq p_{jk}-d_{ij}-c_{jk} + Q_2$ and holds for big number $Q_2$ by our construction of $s_i^t$;
+    \item \eqref{is there lazy worker}: By our construction of $\zeta_{i}^t$, either of the following two cases holds: 
+    if $\sum_{jk\in\mathcal{M}^t} x_{ijk}^t=W_i^t$ and we construct $\zeta_{i}^t=1$, thus \eqref{is there lazy worker} becomes $\sum_{jk\in\mathcal{M}^t}x_{ijk}^t\geq W_i^t$ and holds;
+    if $\sum_{jk\in\mathcal{M}^t} x_{ijk}^t<W_i^t$ and we construct $\zeta_{i}^t=0$, thus \eqref{is there lazy worker} becomes $\sum_{jk\in\mathcal{M}^t}x_{ijk}^t\geq W_i^t - Q_1$ and holds for big number $Q_1$;
+    \item \eqref{stability end}: By our construction, either of the following two cases holds: 
+    if $\sum_{jk\in\mathcal{M}^t} x_{ijk}^t=W_i^t$ and we construct $\zeta_{i}^t=1$, thus \eqref{stability end} becomes $s_i^t\leq Q_2$ and holds for big number $Q_2$;
+    if $\sum_{jk\in\mathcal{M}^t} x_{ijk}^t<W_i^t$, we construct $\zeta_{i}^t=0$ and $s_i^t=\min \left\{\min_{jk\in \mu(i)} \left(p_{jk}-d_{ij}-c_{jk}\right),0\right\}$, \eqref{stability end} becomes $s_i^t\leq 0$ and holds by our construction of $s_i^t$;
+    \item \eqref{si bigger if not full}: Either of the following cases holds: 
+    if $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} = M_{jk}^t$, we construct $\delta_{ijk}^t=1$, \eqref{si bigger if not full} becomes $s_i^t \leq p_{jk} - d_{ij} - c_{jk} - Q_2$ and holds for big number $Q_2$; 
+    if $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} < M_{jk}^t$, we construct $\delta_{ijk}^t=0$, \eqref{si bigger if not full} becomes $s_i^t \geq p_{jk} - d_{ij} - c_{jk}$ and holds, because the matching is stable, which implies that $\sum_{i':d_{i'j}\le d_{ij}} x^t_{i'jk} < M_{jk}^t$ and $s_i^t=\hat{s}_i^t<p_{ij}-d_{jk}-c_{jk}$ does not hold simultaneously, thus we must have $s_i^t \geq p_{jk} - d_{ij} - c_{jk}$.
+\end{itemize}
 
-    By the definition of set $T$ and constraint (26), we have that for all $w,j,k$,
+
+\paragraph{Sufficiency}: We then show that a job assignment flow $\left\{x_{ijk}^t\right\}_{i,j,k}$ that satisfies constraints from the model is a stable matching.
+
+To show that the matching is stable, we only need to show that for all $(i,jk)$ pair, the two conditions do not hold simultaneously. That is,
+\[
+\sum_{i': d_{i'j} \le d_{ij}} x_{i'jk}^t < M_{jk}^t
+\]
+and 
+\[
+\hat{s}_i^t < p_{jk} - d_{ij} - c_{jk}
+\]
+does not hold simultaneously for all $i,j,k$. We consider two cases based on the value of $\delta^t_{ijk}$ for any $i,j,k$.
+
+For those $i,j,k$ such that $\sum_{i': d_{i'j} \le d_{ij}} x_{i'jk}^t = M_{jk}^t$, the first condition is violated and the two conditions must not hold simultaneously, i.e., the pair is not a blocking pair.
+
+For those $i,j,k$ such that $\sum_{i': d_{i'j} \le d_{ij}} x_{i'jk}^t < M_{jk}^t$, we must show that 
+\begin{align}\label{eq:sihatt}
+\hat{s}_i^t \geq p_{jk} - d_{ij} - c_{jk}.
+\end{align}
+
+Since \eqref{deltaM} holds and $\sum_{i': d_{i'j} \le d_{ij}} x_{i'jk}^t < M_{jk}^t$, $\delta_{ijk}^t$ must be 0, and \eqref{si bigger if not full} becomes
+\[
+s_i^t \ge p_{jk} - d_{ij} - c_{jk}. 
+\]
+Therefore, to prove \eqref{eq:sihatt}, it is sufficient to prove that $s_i^t \leq \hat{s}_i^t$. We consider two cases separately:
+\begin{itemize}
+    \item If $\sum_{jk\in\mathcal{M}^t}x_{ijk}^t=W_i^t$, by the definition of $\hat{s}_i^t$ in \eqref{definition s hat}, we have
     \[
-    RHS = \sum_{
-    \substack{
-    {w'\in \mathcal{W}} \\ {i':d_{i'j}<d_{ij}}
-        }
-    }y_{w'i'jk}^t \ge \delta_{wijk}^t M_{jk}^t.
+    \hat{s}_i^t = \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right).
     \]
-    
-    Thus to prove the proposition, we need to show that for all job $jk$, $w$ and its location $i$,
+    For any job $j'k'\in \mu^t(i)$, $x_{ij'k'}^t>0$ and since \eqref{Qeta} holds, $\eta_{ij'k'}^t$ must be $1$ and \eqref{si as lower bound} becomes 
     \[
-    \delta_{wijk}^t M_{jk}^t \ge M_{jk}^t \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t)
+    s_i^t \leq p_{j'k'} - c_{j'k'} - d_{ij'} \quad \forall j'k' \in \mu^t(i).
+    \]
+    Thus we have 
+    \[
+    s_i^t \leq \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right) = \hat{s}_i^t.
     \]
 
-    This naturally holds when $jk$ is not an available job at time $t$ and therefore $M_{jk}^t=0$. When $jk$ is available at time $t$ and $M_{jk}^t\neq0$, we need to show that
+    \item If $\sum_{jk\in\mathcal{M}^t}x_{ijk}^t<W_i^t$, since \eqref{is there lazy worker} holds, $\zeta_i^t$ must be $0$; and by the definition of $\hat{s}_i^t$ in \eqref{definition s hat}, we have
     \[
-    \delta_{wijk}^t \ge \, (1-\sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t)
+    \hat{s}_i^t = \min\left\{0, \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right)\right\}.
     \]
-
-    This requires us to prove that if $\delta_{wijk}^t=0$, then 
+    For those jobs $j'k'\in \mu^t(i)$, $x_{ij'k'}^t>0$ and since \eqref{Qeta} holds, $\eta_{ij'k'}^t$ must be $1$ and \eqref{si as lower bound} becomes 
     \[
-    \sum_{j'k'\in S}\,\sum_{i'\in \mathcal{N}}y_{wi'jk}^t=1
+    s_i^t \leq p_{jk} - c_{jk} - d_{ij} \quad \forall i,j,k,
     \]
-    must hold for all $w,i,jk$.
-
-    In fact, when $\delta_{wijk}^t=0$, constraint (25) is equivalent to 
+    Thus we have 
     \[
-    u_{wi}^t \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t
+    s_i^t \leq \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right).
     \]
-    By the definition of $u_{wi}^t$, this is further equivalent to
+    Additionally, since $\zeta_i^t=0$, from \eqref{stability end} we know that $s_i^t \leq 0$. Thus, combining the two results, we know that
     \[
-    \sum_{j,k\in \mathcal{N}} y_{wijk}^t \left( p_{jk} - d_{ij} - c_{jk} \right) \ge \left( p_{jk} - d_{ij} - c_{jk} \right) l_{wi}^t
+    s_i^t \leq \min\left\{0, \min_{jk\in \mu^t(i)} \left(p_{jk}-d_{ij}-c_{jk}\right)\right\} = \hat{s}_i^t.
     \]
 \end{itemize}
+
 
 \newpage
 
-{\color{red}
-Previously we have:
-\begin{align}
-    & y_{wm}^t \in \{0,1\} &\forall (w,m)\in \mathcal{W}^t\times \mathcal{M}^t\\[4pt]
-    & \sum_{m\in \mathcal{M}^t} y_{wm}^t \le 1  &\forall w\in \mathcal{W}^t; t\in [T]\\[4pt]
-    &\sum_{w\in \mathcal{W}^t} y_{wm}^t \le M_m^t &\forall m\in \mathcal{M}^t; t\in [T] \\[4pt]
-    &M_m^t\,(1 - \sum_{q\in S_{mw}}y^t_{wq}) \leq \sum_{p\in T_{mw}} y^t_{pm} & \forall (w,m)\in \mathcal{W}^t\times \mathcal{M}^t,\;t\in [T]
-    \\[4pt]
-    & x_{ijk}^t = \sum y^t_{wm} & \forall t\in [T],\,i,j,k\in N\\[4pt]
-\end{align}
-where the major problem is that the index set for constraints is uncertain
-}
+\subsection{Stochastic Dual Dynamic Integer Programming\citep{zou2019stochastic}}\label{sec:sddip}
 
+
+Formally, SDDiP targets problems of the form
+\begin{equation}\label{eq:msip-standard}
+    Q_n(x_{a(n)}) = \min_{x_n,\,y_n}\left\{
+    f_n(x_n,y_n) + \sum_{m\in C(n)} q_{nm}\,Q_m(x_n)
+    \;:\;
+    (x_{a(n)},x_n,y_n)\in X_n,\;
+    x_n\in\{0,1\}^d
+    \right\},
+\end{equation}
+where $x_n\in\{0,1\}^d$ is the binary state variable linking node $n$ to its children, $y_n$ is a local (possibly mixed-integer) variable, $f_n$ is a linear objective, and $X_n$ is a compact mixed-integer polyhedral set. For problems with general integer or continuous state variables, \citep{zou2019stochastic} show that they can be approximated to precision $\varepsilon$ via binary expansion, with the number of binary state variables per stage bounded by $k \le d(\lfloor\log_2(M/\varepsilon)\rfloor+1)$, where $d$ is the original state dimension and $M$ depends on problem data.
+
+We now examine the structural requirements for applying SDDiP to our micromobility operations problem, and identify the challenges that arise.
+
+
+\subsubsection{Requirement 1: MILP Stage Subproblems}\label{sec:milp-req}
+
+SDDiP requires that each stage subproblem is a mixed-integer linear program (MILP).Bilinear term $p_{jk}\,\tilde{m}_{jk}^t$ in the objective.
+
+
+
+\subsubsection{Requirement 2: Binary State Variables and DP Reformulation}\label{sec:binary-state}
+
+SDDiP requires the state variables---those linking consecutive stages---to be binary. Applying this to our problem involves two steps: (i)~restoring the Markov property via pipeline augmentation, and (ii)~binarizing all integer state variables.
+
+\paragraph{Step 1: Pipeline augmentation.}
+The state transitions \eqref{FlowTransition} involve multi-period delays: user trips from $i$ to $j$ require $t_{ij}$ periods, and worker tasks from $i$ via $(j,k)$ require $\delta_{ijk}:=d_{ij}+c_{jk}$ periods. The delayed terms $Y_{ij}^{t-t_{ij}}$ and $x_{ijk}^{t-\delta_{ijk}}$ make the system non-Markovian. We restore the Markov property by introducing \emph{pipeline state variables} that track all in-transit entities.
+
+For each OD pair $(i,j)$ with travel time $t_{ij}\ge 2$, define
+\[
+    P_{ij,r}^t := \text{number of bikes in transit from $i$ to $j$, arriving in $r$ more periods},
+    \quad r=1,\ldots,t_{ij}-1.
+\]
+These evolve via
+\begin{align}
+    P_{ij,r}^{t+1} &= P_{ij,r+1}^{t},
+    &r=1,\ldots,t_{ij}-2, \label{eq:pipe-bike}\\
+    P_{ij,t_{ij}-1}^{t+1} &= Y_{ij}^{t+1}. \nonumber
+\end{align}
+The arrival terms then become functions of the current state: $F_j^t = \sum_i P_{ij,1}^t(1-\phi_{ij})$ and $\bar{F}_j^t = \sum_i P_{ij,1}^t\phi_{ij}$.
+
+Similarly, for each worker-task triple $(i,j,k)$ with delay $\delta_{ijk}\ge 2$, define
+\[
+    G_{ijk,r}^t := \text{number of workers dispatched from $i$ for task $(j,k)$, arriving at $k$ in $r$ more periods},
+\]
+for $r=1,\ldots,\delta_{ijk}-1$, with an analogous shift-and-entry transition:
+\begin{align}
+    G_{ijk,r}^{t+1} &= G_{ijk,r+1}^{t},
+    &r=1,\ldots,\delta_{ijk}-2, \label{eq:pipe-worker}\\
+    G_{ijk,\delta_{ijk}-1}^{t+1} &= x_{ijk}^{t+1}. \nonumber
+\end{align}
+
+The complete Markov state at time $t$ (excluding pricing) is then
+\begin{equation}\label{eq:state-op}
+\boxed{
+    \mathbf{s}_t^{\mathrm{op}} = \Big(\;
+    \underbrace{A_j^t,\; U_j^t,\; W_j^t}_{j\in\mathcal{N}},\;\;
+    \underbrace{M_{jk}^t}_{j,k\in\mathcal{N}},\;\;
+    \underbrace{P_{ij,r}^t}_{\substack{i,j\in\mathcal{N}\\r=1,\ldots,t_{ij}-1}},\;\;
+    \underbrace{G_{ijk,r}^t}_{\substack{i,j,k\in\mathcal{N}\\r=1,\ldots,\delta_{ijk}-1}}
+    \;\Big).
+}
+\end{equation}
+
+Using these pipeline variables, the original transition equations \eqref{FlowTransition} are rewritten as
+\begin{subequations}\label{eq:transitions-rewrite}
+\begin{align}
+    A_j^{t+1}
+    &= A_j^t - Y_j^t
+    + \textstyle\sum_{i} P_{ij,1}^t(1-\phi_{ij})
+    - \sum_{k\neq j} \hat{m}_{jk}^t
+    + \sum_{i,k} G_{ikj,1}^t,
+    &\quad \forall j, \label{eq:A-trans}\\[3pt]
+    U_j^{t+1}
+    &= U_j^t
+    + \textstyle\sum_{i} P_{ij,1}^t\phi_{ij}
+    - \sum_{i} G_{ijj,1}^t,
+    &\quad \forall j, \\[3pt]
+    W_k^{t+1}
+    &= W_k^t
+    - \textstyle\sum_{i,j} x_{kij}^t
+    + \sum_{i,j} G_{ijk,1}^t,
+    &\quad \forall k, \\[3pt]
+    M_{jk}^{t+1}
+    &= M_{jk}^t - \tilde{m}_{jk}^t + \hat{m}_{jk}^{t+1},
+    &\quad \forall j,k. \label{eq:M-trans}
+\end{align}
+\end{subequations}
+All arrival terms now depend only on the current state $\mathbf{s}_t^{\mathrm{op}}$, restoring the Markov property.
+
+\paragraph{Step 2: Binarization.}
+All components of $\mathbf{s}_t^{\mathrm{op}}$ are nonneg.\ integers with known upper bounds. By Theorem~3 of \citep{zou2019stochastic}, each integer variable $s\in\{0,1,\ldots,U\}$ is replaced by its binary expansion $s=\sum_{l=1}^\kappa 2^{l-1}\lambda_l$ with $\lambda_l\in\{0,1\}$ and $\kappa=\lfloor\log_2 U\rfloor+1$. Table~\ref{tab:binary-op} counts the resulting binary state variables for a representative instance.
+
+\begin{table}[htbp]
+\centering
+\caption{Binary state variable count per stage (operational state only) for $n=|\mathcal{N}|=10$, $B_{\max}=100$, $W=30$, $M_{\max}=20$, uniform $t_{ij}=3$, uniform $\delta_{ijk}=5$.}
+\label{tab:binary-op}
+\small
+\begin{tabular}{l r r r r}
+\hline
+\textbf{Variable group} & \textbf{Integer vars} & $\kappa$ &
+  \textbf{Binary vars} & \textbf{\% of total}\\
+\hline
+$A_j^t$       & 10    & 7 & 70       & 0.3\% \\
+$U_j^t$       & 10    & 7 & 70       & 0.3\% \\
+$W_k^t$       & 10    & 5 & 50       & 0.2\% \\
+$M_{jk}^t$    & 100   & 5 & 500      & 2.3\% \\
+$P_{ij,r}^t$  & $100\times 2=200$  & 7 & 1{,}400   & 6.3\% \\
+$G_{ijk,r}^t$ & $1{,}000\times 4=4{,}000$ & 5 & 20{,}000  & 90.6\% \\
+\hline
+\textbf{Total $K_{\mathrm{op}}$}
+              &       &   & \textbf{22{,}090} & 100\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The worker pipeline $G_{ijk,r}^t$ dominates at $90.6\%$ of the total, scaling as $O(n^3\bar{\delta})$ where $\bar{\delta}$ is the average worker travel delay.
+
+\paragraph{Comparison with existing SDDiP benchmarks.}
+As a reference point, the portfolio optimization experiment in \citep{zou2019stochastic} involves $n=100$ stocks from the S\&P~100 index with continuous state variables (asset values) approximated via binary expansion to precision $\varepsilon=10^{-2}$, resulting in approximately 1{,}500 binary state variables per stage. That experiment achieves optimality gaps of $1$--$2\%$ within 10 iterations across horizons of $T=4$ to $T=12$ stages. Our operational state of $K_{\mathrm{op}}=22{,}090$ binary variables per stage is roughly 15 times larger, suggesting that directly applying SDDiP to the full model (with all pipeline variables) would face significant computational challenges. Dimensionality reduction---via instant-travel approximations ($t_{ij}=\delta_{ijk}=1$, eliminating all pipeline variables and reducing $K_{\mathrm{op}}$ to 690), network aggregation ($n=5$ yields $K_{\mathrm{op}}\approx 3{,}300$), or sparsification of inactive OD triples---would be essential for computational tractability.
+
+
+
+
+\subsection{Progressive Hedging Algorithm\citep{gade2016obtaining}}
+
+Denote the pricing decision as $p$, the job posting decision as $m$ and all other decision variables as $x$, since the constraints are all linear after reformulation, the problem can be modeled as
+\begin{align}
+    \mathbf{\max} \quad
+    &\mathbb{E}\left[
+    \sum_{t=1}^{T}
+    \left(
+    \sum_{i\in \mathcal{N}} \big( \sum_{j\in \mathcal{N}}R_{ij}\, Y_{ij}^t - C_p\, L_{i}^t \big)
+    - \sum_{j,k\in \mathcal{N}} p_{jk}\, \tilde{m}_{jk}^t
+    \right)
+    \right]\\[4pt]
+    \textbf{s.t.}\nonumber\\
+    & A_p\,p + A_m\, m + A_x\,x \le b.
+\end{align}
+Suppose the stochasticity is modeled as several scenarios, each scenario is denoted as $s\in \mathcal{S}$, then the model can be written as (denote the objective function as $f(p,m,x)$):
+
+\begin{align}
+    \mathbf{\max} \quad
+    &\sum_{s\in \mathcal{S}}
+    f\big(p(s),m(s),x(s)\big)\pi_s\\[4pt]
+    \textbf{s.t.}\nonumber\\
+    & A_p(s)\,p(s) + A_m(s)\, m(s) + A_x(s)\,x(s) \le b(s) \label{constraints} & \forall s\in \mathcal{S}\\
+    &p(s)=p(s')=\hat{p} & \forall s,s'\in \mathcal{S}.\label{non-anticipativity constraint}
+\end{align}
+
+Solve this problem by solving
+\begin{align}
+    \mathbf{\max} \quad
+    &\sum_{s\in \mathcal{S}} \left[
+    f\big(p(s),m(s),x(s)\big)\pi_s -\lambda_s(p(s)-\hat{p}) + {\rho\over2}(p(s)-\hat{p})^2
+    \right]\\[4pt]
+    \textbf{s.t.}\nonumber\\
+    & A_p(s)\,p(s) + A_m(s)\, m(s) + A_x(s)\,x(s) \le b \label{constraints} & \forall s\in \mathcal{S}.
+\end{align}
+
+The objective can be decomposed into several scenarios, and we can solve this by using the following procedure
+\begin{itemize}
+    \item For iteration $k=1,2,...,N$:
+    \begin{itemize}
+        \item fix $\hat{p}^{k}$;
+        \item For scenarios $s=1,2,...,S$:
+        \begin{itemize}
+            \item Solve deterministic subproblem
+            \begin{align*}z^*(s)&=f(p^*(s),m^*(s),x^*(s))\\
+            &=\max_{p(s),m(s),x(s)}
+            \left\{
+            f(p(s),m(s),x(s))\mid A_p(s)\,p(s) + A_m(s)\, m(s) + A_x(s)\,x(s) \le b(s)
+            \right\}
+            \end{align*}
+        \end{itemize}
+        \item Update $\hat{p}^{k+1}=\sum_{s\in \mathcal{S}}\pi_s p^*(s)$
+        \item Update $\lambda_s^{k+1} = \lambda_s^{k} + \rho\pi_s (p^*(s)-\hat{p}^{k+1})$
+    \end{itemize}
 \end{itemize}
+
+\paragraph{Multistage Problems} For a multi-stage stochastic problem, let $\xi^{[t]}(s) = 
+(\xi_1(s),\ldots,\xi_t(s))$ denote the partial history of scenario 
+$s$ up to stage $t$. Two scenarios $s$ and $s'$ are 
+\emph{indistinguishable} at stage $t$ if $\xi^{[t]}(s)=\xi^{[t]}(s')$; 
+this defines an equivalence relation whose classes are the 
+\emph{scenario tree nodes} at stage $t$. Let $\mathcal{T}_t$ denote 
+the set of all nodes at stage $t$, with each node $n\in\mathcal{T}_t$ 
+identified by its partial history $\xi^{[t]}$.
+
+We then define:
+\begin{itemize}
+    \item $n(s,t)\in\mathcal{T}_t$: the node at stage $t$ to which 
+          scenario $s$ belongs, i.e.\ $n(s,t)=\xi^{[t]}(s)$;
+    \item $\mathcal{S}(n)=\{s\in\mathcal{S}: n(s,t)=n\}$: the set 
+          of all scenarios passing through node $n\in\mathcal{T}_t$;
+    \item $\pi_n = \sum_{s\in\mathcal{S}(n)}\pi_s$: the marginal 
+          probability of reaching node $n$.
+\end{itemize}
+The non-anticipativity constraints (NAC) then require that decisions 
+depend only on the information available at each node:
+\begin{align}
+    p(s) &= \hat{p} 
+    & \forall s\in\mathcal{S}, \label{nac-p}\\
+    m^t(s) &= \hat{m}^t_{n(s,t)} 
+    & \forall s\in\mathcal{S},\; t=1,\ldots,T. \label{nac-m}
+\end{align}
+Relaxing \eqref{nac-p}--\eqref{nac-m} via an augmented Lagrangian 
+yields the decomposed subproblem for scenario $s$ at iteration $k$:
+\begin{align}
+    z^*(s) = \max_{p(s),m(s),x(s)} \Bigg\{
+    &\pi_s f\big(p(s),m(s),x(s)\big) \notag\\
+    &-\lambda^{0,k}_s\big(p(s)-\hat{p}^k\big)
+     +\tfrac{\rho}{2}\big(p(s)-\hat{p}^k\big)^2 \notag\\
+    &-\sum_{t=1}^{T}\!\left[
+        \lambda^{t,k}_s\big(m^t(s)-\hat{m}^{t,k}_{n(s,t)}\big)
+       +\tfrac{\rho}{2}\big(m^t(s)-\hat{m}^{t,k}_{n(s,t)}\big)^2
+      \right] \Bigg\} \notag\\
+    \text{s.t.}\quad
+    &A_p(s)\,p(s)+A_m(s)\,m(s)+A_x(s)\,x(s)\le b(s).
+\end{align}
+The algorithm proceeds as follows. For iteration $k=1,2,\ldots$:
+\begin{itemize}
+    \item Fix $\hat{p}^k$ and $\hat{m}^{t,k}_n$ for all $t,n$.
+    \item For each $s\in\mathcal{S}$ (in parallel): solve the 
+          deterministic subproblem to obtain 
+          $p^*(s),\{m^{t*}(s)\},x^*(s)$.
+    \item Update consensus:
+    \begin{align}
+        \hat{p}^{k+1} &= \sum_{s\in\mathcal{S}}\pi_s\,p^*(s),\\
+        \hat{m}^{t,k+1}_n &= \frac{1}{\pi_n}
+            \sum_{s\in\mathcal{S}(n)}\pi_s\,m^{t*}(s)
+            \quad \forall\,t,\,\forall\,n\in\mathcal{T}_t.
+    \end{align}
+    \item Update multipliers for all $s\in\mathcal{S}$:
+    \begin{align}
+        \lambda^{0,k+1}_s &= \lambda^{0,k}_s
+            +\rho\,\pi_s\big(p^*(s)-\hat{p}^{k+1}\big),\\
+        \lambda^{t,k+1}_s &= \lambda^{t,k}_s
+            +\rho\,\pi_s\big(m^{t*}(s)
+            -\hat{m}^{t,k+1}_{n(s,t)}\big)
+            \quad \forall\,t.
+    \end{align}
+    \item Terminate if $|p^*(s)-\hat{p}^{k+1}|\le\varepsilon$ and 
+          $|m^{t*}(s)-\hat{m}^{t,k+1}_{n(s,t)}|\le\varepsilon$ 
+          for all $s,t$.
+\end{itemize}
+
+
 \printbibliography
 \end{document}
