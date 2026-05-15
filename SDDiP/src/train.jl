@@ -78,18 +78,9 @@ function _make_handler(s::Symbol; encoding::Symbol = :int, oa_iters::Int = 20)
     end
 end
 
-# BFGS for int (low-dim, fast convergence);
-# OuterApproximation for bin (high-dim, avoids ill-conditioned BFGS matrix).
-# oa_iters controls inner cutting-plane budget (default 20, patched to accept parameter).
+# BFGS for both int and bin.
+# OA was tried for bin but caused structural degeneracy (bound frozen at 8629 from iter 1).
+# oa_iters retained as parameter for potential future use.
 function _make_ld(encoding::Symbol; oa_iters::Int = 20)
-    if encoding == :bin
-        return SDDP.LagrangianDuality(;
-            method = SDDP.LocalImprovementSearch.OuterApproximation(
-                optimizer_with_attributes(Gurobi.Optimizer, "OutputFlag" => 0),
-                oa_iters,
-            ),
-        )
-    else
-        return SDDP.LagrangianDuality()  # default BFGS(100)
-    end
+    return SDDP.LagrangianDuality()  # default BFGS(100) for all encodings
 end

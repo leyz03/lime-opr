@@ -64,11 +64,8 @@ function declare_controls!(sp::Model, p::BikeParams)
     # s_i[i]: worker reservation utility — intentionally unbounded (free real)
     @variable(sp, s_i[i in N])
 
-    # ── Demand placeholders (fixed each period by SDDP.parameterize) ──────────
-    # D_ij[i,j]: OD demand realisation for this scenario
-    @variable(sp, 0 <= D_ij[i in N, j in N])
-
-    # D_i[i]: node-total demand  (= Σ_j D_ij[i,j], fixed in parameterize)
+    # ── Demand placeholder (fixed each period by SDDP.parameterize) ───────────
+    # D_i[i]: node-total demand, fixed to ω.D_i[i] each scenario
     @variable(sp, 0 <= D_i[i in N])
 
     return (
@@ -84,7 +81,6 @@ function declare_controls!(sp::Model, p::BikeParams)
         eta_ijk   = sp[:eta_ijk],
         zeta_i    = sp[:zeta_i],
         s_i       = sp[:s_i],
-        D_ij      = sp[:D_ij],
         D_i       = sp[:D_i],
     )
 end

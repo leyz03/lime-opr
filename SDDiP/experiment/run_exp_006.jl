@@ -24,7 +24,7 @@ include(joinpath(@__DIR__, "common_setting.jl"))
 using JuMP, Gurobi, CSV, DataFrames
 
 k_idx   = findfirst(==("--k"), ARGS)
-K_LIST  = k_idx === nothing ? [5, 8] : [parse(Int, ARGS[k_idx + 1])]
+K_LIST  = k_idx === nothing ? [10] : [parse(Int, ARGS[k_idx + 1])]
 
 HANDLERS    = [:CCD, :SCD, :LD, :Bandit]
 ITER_LIMIT  = 200

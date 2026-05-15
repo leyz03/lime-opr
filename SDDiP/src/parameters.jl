@@ -105,7 +105,7 @@ struct BikeParams
 
     # Big-M constants (set per §2 of instruction; do not shrink)
     Q1::Float64                # ≥ W_tot  (worker flow)
-    Q2::Float64                # ≥ max p_jk  (stability s[i] bounds)
+    Q2::Float64                # ≥ max p_jk + max d_ij + max c_jk  (stability s[i] bounds)
     Q3::Float64                # ≥ Σ(A0+U0)  (task pool Big-M)
 end
 
@@ -236,12 +236,14 @@ function build_params(cfg::LinearScenarioConfig; seed::Int=0)::BikeParams
     W_tot = sum(W0)
     M_max = B_max               # conservative: task pool ≤ total bikes
 
-    # ── Big-M constants (per instruction §2; do NOT shrink) ───────────────────
-    # Q1 ≥ W_tot  → worker flow Big-M
-    # Q2 ≥ max p_jk  → s[i] upper/lower bound Big-M
-    # Q3 ≥ Σ(A0+U0) → task pool Big-M
+    # ── Big-M constants ───────────────────────────────────────────────────────
+    # Q1 ≥ W_tot  → big-M for x (worker flow) and zeta constraints
+    # Q2 ≥ max(p_jk) + max(d_ij) + max(c_jk)  → big-M for s[i] stability bounds:
+    #   when η=0, s_i ≤ profit + Q2 must not bind; profit ≥ -max_d - max_c,
+    #   so Q2 ≥ s_i_max - profit_min = max_p + max_d + max_c.
+    # Q3 ≥ Σ(A0+U0) → task backlog Big-M (reserved; deltaM uses Q_M=2*M_max instead)
     Q1 = Float64(W_tot)
-    Q2 = maximum(p_mat)          # tight Big-M: Q2 ≥ max p_jk
+    Q2 = maximum(p_mat) + maximum(d_mat) + maximum(c_mat)
     Q3 = Float64(sum(A0) + sum(U0) + sum(abs.(M0)) + 1)
 
     return BikeParams(

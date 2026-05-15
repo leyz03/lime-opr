@@ -2,7 +2,7 @@
 
 **Project:** Bike-sharing joint pricing, demand matching, and worker routing  
 **Method:** Stochastic Dual Dynamic integer Programming (SDDiP) in Julia / SDDP.jl  
-**See also:** [IMPLEMENTATION.md](IMPLEMENTATION.md) · [ISSUES.md](ISSUES.md)
+**See also:** [IMPLEMENTATION.md](IMPLEMENTATION.md) · [ISSUES.md](ISSUES.md) · [DIRECTIONS.md](DIRECTIONS.md)
 
 ---
 
@@ -38,6 +38,7 @@
 | EXP-OA-SWEEP | bin+LD OA 预算扫描 | ✅ |
 | EXP-BFGS-BIN | bin+LD BFGS 替代 OA 诊断 | ✅ |
 | EXP-010 | 全方法对比（int/bin × 4 handler，K=20） | ✅ |
+| EXP-011 | 收敛曲线 / 迭代敏感性（iter=100→600） | ✅ |
 
 ---
 
@@ -190,6 +191,62 @@
 - **bin+LD bound 最紧**（49.52），策略优于其他 bin 方法，但 gap 仍大（收敛慢，需更多迭代）
 - **Bandit 两种编码均失效**，见 [ISSUES.md §Bandit-失效机制](ISSUES.md#调查-bandit-失效机制)
 - **BoundStalling 作为终止准则不可靠**，见 [ISSUES.md §终止准则](ISSUES.md#终止准则与合理迭代次数)
+
+---
+
+### EXP-011 — 收敛曲线 / 迭代敏感性
+**Date:** 2026-05-15 | **Config:** 同 common_setting (n=3, T=4, K=20)，seed=42，nsim=300  
+**Script:** `experiment/run_convergence_curve.jl` → `results/convergence_curve/convergence_curve.csv`  
+**目的：** EXP-010 仅在 300 iter 取单点，结论可能不稳。本实验记录 iter=100→600 全过程的 bound / sim_μ / gap，用于判断（a）排名是否随迭代数变化，（b）sim_μ/gap 波动性来源。
+
+完整数据（gap% = (bound − sim_μ)/|sim_μ|×100；sim_ci ≈ ±10，下表略）：
+
+| 方法 | iter | bound | sim_μ | gap% |
+|---|---|---|---|---|
+| int+CCD | 100 | 55.66 | 37.55 | 48.2 |
+| int+CCD | 200 | 52.59 | 32.16 | 63.5 |
+| int+CCD | 300 | 51.17 | 31.48 | 62.6 |
+| int+CCD | 400 | 50.52 | 34.36 | 47.0 |
+| int+CCD | 500 | 50.15 | 32.49 | 54.4 |
+| int+CCD | 600 | 49.50 | 35.23 | 40.5 |
+| int+SCD | 100 | 53.84 | 30.04 | 79.3 |
+| int+SCD | 200 | 50.47 | 32.39 | 55.8 |
+| int+SCD | 300 | 49.62 | 30.98 | 60.2 |
+| int+SCD | 400 | 49.17 | 32.43 | 51.6 |
+| int+SCD | 500 | 48.77 | 31.62 | 54.2 |
+| int+SCD | 600 | 48.51 | 39.76 | 22.0 |
+| int+LD  | 100 | 56.61 | 30.13 | 87.9 |
+| int+LD  | 200 | 51.59 | 27.00 | 91.1 |
+| int+LD  | 300 | 50.07 | 36.25 | 38.2 |
+| int+LD  | 400 | 49.47 | 37.25 | 32.8 |
+| int+LD  | 500 | 49.11 | 31.74 | 54.7 |
+| int+LD  | 600 | 48.68 | 42.72 | **14.0** |
+| bin+CCD | 100 | 56.00 | 31.25 | 79.2 |
+| bin+CCD | 200 | 51.59 | 30.20 | 70.8 |
+| bin+CCD | 300 | 50.37 | 33.43 | 50.7 |
+| bin+CCD | 400 | 49.58 | 38.00 | 30.5 |
+| bin+CCD | 500 | 49.17 | 41.41 | 18.7 |
+| bin+CCD | 600 | 48.95 | 28.07 | 74.3 |
+| bin+SCD | 100 | 55.06 | 36.95 | 49.0 |
+| bin+SCD | 200 | 50.85 | 42.60 | 19.4 |
+| bin+SCD | 300 | 49.35 | 40.01 | 23.3 |
+| bin+SCD | 400 | 48.55 | 36.25 | 33.9 |
+| bin+SCD | 500 | 48.18 | 27.06 | 78.1 |
+| bin+SCD | 600 | **48.04** | **43.89** | **9.5** |
+| bin+LD  | 100 | 54.76 | 30.65 | 78.7 |
+| bin+LD  | 200 | 51.12 | 31.30 | 63.4 |
+| bin+LD  | 300 | 49.84 | 28.64 | 74.0 |
+| bin+LD  | 400 | 48.84 | 33.91 | 44.0 |
+| bin+LD  | 500 | 48.45 | 37.12 | 30.5 |
+| bin+LD  | 600 | 48.11 | 40.91 | 17.6 |
+
+**关键发现：**
+- **排名随迭代数翻转**：300 iter 下 int+SCD 最优（EXP-010 结论），但 600 iter 下 **bin+SCD 综合最优**（bound=48.04 最低，sim_μ=43.89 最高，gap=9.5%）。说明 EXP-010 的 300 iter 单点不足以定论。
+- **bound 单调光滑下降，sim_μ 剧烈非单调**（如 bin+SCD：36.95→42.60→40.01→36.25→27.06→43.89），且 gap 跟随 sim_μ 大幅摆动。bin+LD 在本 run 未冻结（OA 预算与 EXP-008 不同）。
+- sim_μ/gap 的高波动性是**仿真估计量的方差问题，非策略不收敛**，方法学分析见 [ISSUES.md §sim_μ/gap 波动性与有意义的收敛评估](ISSUES.md#simμgap-波动性与有意义的收敛评估)。
+- 附图：`results/convergence_curve/convergence_iter.png`、`convergence_time.png`。
+
+> **未记录附带产物**：`results/exp_008/`（bin 4-handler 复现，bin+LD 冻结 bound=8629，已归入 EXP-008 现象）、`results/exp_oa_sweep/logs/`（oa_50 冻结 8629、oa_200 冻结 5162.04，已归入 [ISSUES.md §bin+LD OA 结构性退化](ISSUES.md#调查binld-oa-结构性退化)）。无需单列实验编号。
 
 ---
 

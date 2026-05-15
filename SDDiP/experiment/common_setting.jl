@@ -41,14 +41,17 @@ function build_new_setting_params(; seed::Int=42)
     W0 = [0, 3, 3]
     M0 = zeros(Int, 3, 3)
 
+    Q1 = Float64(sum(W0))
+    Q2 = maximum(p_base.p_jk) + maximum(p_base.d_ij) + maximum(p_base.c_ij)
+    Q3 = Float64(sum(A0) + sum(U0) + 1)
+
     return BikeParams(
         p_base.N, p_base.T, p_base.t_ij, p_base.d_ij, p_base.c_ij, p_base.δ_ijk,
         p_base.φ_ij, p_base.R_ij, p_base.C_p, p_base.p_jk,
         p_base.λ_ijt, p_base.od_dirichlet_alpha,
         sum(A0), sum(W0), sum(A0),
         A0, U0, W0, M0,
-        Float64(sum(W0)), maximum(p_base.p_jk),
-        Float64(sum(A0) + sum(U0) + 1),
+        Q1, Q2, Q3,
     )
 end
 
@@ -97,14 +100,17 @@ function build_large_setting_params(; seed::Int=42)
     W0 = [0, 3, 3, 2, 2, 2, 2, 2, 2, 2]   # total=20，热点没有工人
     M0 = zeros(Int, n, n)
 
+    Q1 = Float64(sum(W0))
+    Q2 = maximum(p_base.p_jk) + maximum(p_base.d_ij) + maximum(p_base.c_ij)
+    Q3 = Float64(sum(A0) + sum(U0) + 1)
+
     return BikeParams(
         p_base.N, p_base.T, p_base.t_ij, p_base.d_ij, p_base.c_ij, p_base.δ_ijk,
         p_base.φ_ij, p_base.R_ij, p_base.C_p, p_base.p_jk,
         p_base.λ_ijt, p_base.od_dirichlet_alpha,
         sum(A0), sum(W0), sum(A0),
         A0, U0, W0, M0,
-        Float64(sum(W0)), maximum(p_base.p_jk),
-        Float64(sum(A0) + sum(U0) + 1),
+        Q1, Q2, Q3,
     )
 end
 

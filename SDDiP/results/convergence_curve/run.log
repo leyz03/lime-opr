@@ -1,0 +1,779 @@
+──────────────────────────────────────────────────────────────────────
+SETTING: n=3, T=4, bikes=12, workers=6
+  A0 = [2, 5, 5]  (initial bike distribution — REVERSED vs demand)
+  W0 = [0, 3, 3]  (initial workers — mostly at cold nodes)
+  λ_i (stage 1) = [6.0, 1.0, 1.0]
+  R=20.0  C_p=30.0  p_jk=4.0
+  d_ij:
+    [0, 1, 1]
+    [1, 0, 1]
+    [1, 1, 0]
+  c_ij:
+    [3, 1, 1]
+    [1, 3, 1]
+    [1, 1, 3]
+  Theoretical per-rebalance net benefit ≈ R + C_p − p_jk = 46.0
+──────────────────────────────────────────────────────────────────────
+
+收敛曲线监控: total_iter=600, sim_freq=100, nsim=1000, K=20
+方法: int+CCD, int+SCD, int+LD, bin+CCD, bin+SCD, bin+LD
+======================================================================
+
+▶ int+CCD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=55.66  sim_μ=37.55 ±9.63  gap=48.2%  23.8s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=52.59  sim_μ=32.16 ±9.57  gap=63.5%  50.9s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=51.17  sim_μ=31.48 ±9.95  gap=62.6%  81.6s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=50.52  sim_μ=34.36 ±10.05  gap=47.0%  116.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=50.15  sim_μ=32.49 ±10.03  gap=54.3%  150.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=49.5  sim_μ=35.23 ±9.56  gap=40.5%  185.6s
+
+▶ int+SCD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=53.84  sim_μ=30.04 ±9.85  gap=79.3%  56.5s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=50.47  sim_μ=32.39 ±10.07  gap=55.8%  150.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=49.62  sim_μ=30.98 ±10.04  gap=60.2%  282.7s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=49.17  sim_μ=32.43 ±10.04  gap=51.6%  451.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=48.77  sim_μ=31.62 ±10.14  gap=54.2%  656.3s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=48.51  sim_μ=39.76 ±9.87  gap=22.0%  901.4s
+
+▶ int+LD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=56.61  sim_μ=30.13 ±9.88  gap=87.9%  144.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=51.59  sim_μ=27.0 ±10.5  gap=91.1%  384.0s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=50.07  sim_μ=36.24 ±10.02  gap=38.1%  706.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=49.47  sim_μ=37.25 ±10.07  gap=32.8%  1109.5s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=49.11  sim_μ=31.74 ±9.58  gap=54.7%  1586.5s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=48.68  sim_μ=42.72 ±9.97  gap=14.0%  2157.7s
+
+▶ bin+CCD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=56.0  sim_μ=31.25 ±10.14  gap=79.2%  20.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=51.59  sim_μ=30.2 ±9.83  gap=70.8%  49.9s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=50.37  sim_μ=33.43 ±9.82  gap=50.7%  84.3s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=49.58  sim_μ=38.0 ±10.01  gap=30.5%  121.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=49.17  sim_μ=41.41 ±9.91  gap=18.7%  161.1s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=48.95  sim_μ=28.07 ±10.29  gap=74.3%  203.2s
+
+▶ bin+SCD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=55.06  sim_μ=36.95 ±10.07  gap=49.0%  67.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=50.85  sim_μ=42.6 ±10.07  gap=19.4%  179.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=49.35  sim_μ=40.01 ±9.85  gap=23.3%  337.2s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=48.55  sim_μ=36.25 ±9.66  gap=33.9%  536.5s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=48.18  sim_μ=27.06 ±10.02  gap=78.0%  778.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=48.04  sim_μ=43.89 ±9.9  gap=9.5%  1057.6s
+
+▶ bin+LD
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+Set parameter WLSAccessID
+Set parameter WLSSecret
+Set parameter LicenseID to value 2595650
+Academic license 2595650 - for non-commercial use only - registered to zj___@berkeley.edu
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 100  bound=54.76  sim_μ=30.65 ±9.71  gap=78.7%  149.8s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 200  bound=51.12  sim_μ=31.3 ±10.24  gap=63.4%  402.2s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 300  bound=49.84  sim_μ=28.64 ±9.94  gap=74.0%  731.4s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 400  bound=48.84  sim_μ=33.91 ±9.8  gap=44.0%  1150.6s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 500  bound=48.45  sim_μ=37.12 ±10.39  gap=30.5%  1655.2s
+WARNING: numerical stability issues detected
+  - matrix range contains small coefficients
+Very large or small absolute values of coefficients
+can cause numerical stability issues. Consider
+reformulating the model.
+  iter= 600  bound=48.11  sim_μ=40.91 ±9.8  gap=17.6%  2236.2s
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+┌ Warning: Re-training a model with existing cuts!
+│ 
+│ Are you sure you want to do this? The output from this training may be
+│ misleading because the policy is already partially trained.
+│ 
+│ If you meant to train a new policy with different settings, you must
+│ build a new model.
+│ 
+│ If you meant to refine a previously trained policy, turn off this
+│ warning by passing `add_to_existing_cuts = true` as a keyword argument
+│ to `SDDP.train`.
+│ 
+│ In a future release, this warning may turn into an error.
+└ @ SDDP ~/.julia/packages/SDDP/ScjyB/src/algorithm.jl:1181
+
+======================================================================
+收敛曲线摘要（最终行）
+======================================================================
+Method          iter    bound     sim_μ ± ci          gap%
+------------------------------------------------------------
+bin+CCD         600     48.9457   28.0743 ±10.2929    74.34%
+bin+LD          600     48.1115   40.9087 ±9.8047     17.61%
+bin+SCD         600     48.0437   43.8944 ±9.9006     9.45%
+int+CCD         600     49.5      35.2266 ±9.5636     40.52%
+int+LD          600     48.6775   42.7172 ±9.9732     13.95%
+int+SCD         600     48.5083   39.7649 ±9.8661     21.99%
+
+Results → /Users/jingleizeng/Documents/Documents/UCB/SP26/Lime/SDDiP/experiment/../results/convergence_curve/convergence_curve.csv
+可用 plot_convergence.py 绘图

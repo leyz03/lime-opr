@@ -200,6 +200,10 @@ function add_constraints!(sp::Model, p::BikeParams, sv, cv)
     # Group 5 — Aggregate stable matching (Eqs 31–36)
     # ═════════════════════════════════════════════════════════════════════════
 
+    # big-M for task pool constraints: M_in[j,k] + m_hat[j,k] ≤ M_max + M_max = 2*M_max.
+    # Q1 (= W_tot) is too small when M_pool_cur > W_tot and must NOT be used here.
+    Q_M = 2.0 * p.M_max
+
     for i in N, j in N, k in N
         M_pool_cur = M_in[j, k] + m_hat[j, k]    # current available pool
         profit     = p.p_jk[j, k] - p.d_ij[i, j] - p.c_ij[j, k]
@@ -207,7 +211,7 @@ function add_constraints!(sp::Model, p::BikeParams, sv, cv)
         # (deltaM): workers closer to j fill up pool before worker i
         @constraint(sp,
             sum(x[ip, j, k] for ip in N if p.d_ij[ip, j] <= p.d_ij[i, j])
-            >= M_pool_cur - Q1 * (1 - delta_ijk[i, j, k]))
+            >= M_pool_cur - Q_M * (1 - delta_ijk[i, j, k]))
 
         # (Qeta): worker i dispatched to (j,k) only if eta indicator is on
         @constraint(sp, x[i, j, k] <= Q1 * eta_ijk[i, j, k])

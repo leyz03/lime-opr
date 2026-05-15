@@ -88,11 +88,9 @@ function build_model(p::BikeParams; encoding::Symbol = :int, K::Int = 20)
         Ω, P_prob = stage_scenarios[t]
 
         SDDP.parameterize(sp, Ω, P_prob) do ω
-            # Fix node-total demand and OD demand for this scenario
             for i in p.N
                 JuMP.fix(cv.D_i[i], ω.D_i[i]; force = true)
                 for j in p.N
-                    JuMP.fix(cv.D_ij[i, j], ω.D[i, j]; force = true)
                     # Update Y_ij = ρ[i,j] * Y_i[i]: set coefficient of Y_i in c_split
                     JuMP.set_normalized_coefficient(c_split[i, j], cv.Y_i[i], -ω.ρ[i, j])
                 end
