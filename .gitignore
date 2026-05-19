@@ -1,0 +1,6 @@
+# Solver / experiment logs
+*.log
+
+# Local scratch & tooling
+.claude/
+scratchpad.md

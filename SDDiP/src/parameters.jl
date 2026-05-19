@@ -28,6 +28,10 @@ Base.@kwdef struct LinearScenarioConfig
     base_demand_by_node::Union{Nothing,Vector{Float64}}      = nothing
     time_multipliers::Union{Nothing,Vector{Float64}}         = nothing
     od_dirichlet_alpha::Float64                              = 1.0
+    # Deterministic structural OD weights w[i,j,t] (rows over j sum to 1).
+    # nothing → uniform 1/n (legacy). When set, demand randomness comes only
+    # from the per-OD Poisson, not from re-sampling the split.
+    od_pattern::Union{Nothing,Array{Float64,3}}              = nothing
 
     # Geometry
     coords::Union{Nothing,Vector{Tuple{Float64,Float64}}}    = nothing
@@ -219,10 +223,19 @@ function build_params(cfg::LinearScenarioConfig; seed::Int=0)::BikeParams
         ones(T)
     end
 
+    # Structural OD weights w[i,j,t] (rows over j sum to 1). Default uniform.
+    od_w = if cfg.od_pattern !== nothing
+        size(cfg.od_pattern) == (n, n, T) ||
+            error("od_pattern must have size ($n,$n,$T), got $(size(cfg.od_pattern))")
+        Float64.(cfg.od_pattern)
+    else
+        fill(1.0 / n, n, n, T)
+    end
+
     λ_ijt = Array{Float64,3}(undef, n, n, T)
     for i in 1:n, j in 1:n, t in 1:T
-        # Expected OD demand i→j at stage t assuming uniform Dirichlet split (alpha=1 → 1/n per pair)
-        λ_ijt[i, j, t] = base_demand[i] * time_mults[t] / n
+        # Expected OD demand i→j at stage t = node rate × structural split weight
+        λ_ijt[i, j, t] = base_demand[i] * time_mults[t] * od_w[i, j, t]
     end
 
     # ── Initial states ────────────────────────────────────────────────────────

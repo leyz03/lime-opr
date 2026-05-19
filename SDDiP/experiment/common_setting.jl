@@ -15,6 +15,17 @@ common_setting.jl  —  修复后的 baseline settings (for EXP-011 onwards)
 include(joinpath(@__DIR__, "..", "src", "build_model.jl"))
 
 function build_new_setting_params(; seed::Int=42)
+    # Tidal/commute OD pattern (n=3, T=4): morning (t=1,2) everyone flows to
+    # node 3 (out of hot spot), evening (t=3,4) flows back to node 1.
+    # Rows over j sum to 1. Demand randomness is the per-OD Poisson only.
+    od_pat = Array{Float64,3}(undef, 3, 3, 4)
+    for i in 1:3
+        od_pat[i, :, 1] = [0.1, 0.1, 0.8]
+        od_pat[i, :, 2] = [0.1, 0.1, 0.8]
+        od_pat[i, :, 3] = [0.8, 0.1, 0.1]
+        od_pat[i, :, 4] = [0.8, 0.1, 0.1]
+    end
+
     cfg = LinearScenarioConfig(
         n_nodes       = 3,
         T             = 4,
@@ -22,7 +33,8 @@ function build_new_setting_params(; seed::Int=42)
         total_workers = 6,
 
         base_demand_by_node = [6.0, 1.0, 1.0],
-        od_dirichlet_alpha  = 0.3,
+        od_dirichlet_alpha  = 10.0,   # deprecated: split is now deterministic
+        od_pattern          = od_pat,
 
         revenue_level = 20.0,
         penalty_Cp    = 30.0,

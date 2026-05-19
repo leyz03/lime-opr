@@ -13,11 +13,15 @@ scenarios for stage t, in the form expected by SDDP.parameterize:
         # ω.ρ   :: Matrix{Float64}  OD split ratios (n×n), ρ[i,j]=D[i,j]/D_i[i]
     end
 
-Sampling model (per node i, per stage t):
-  1. Node total:  D_i[i] ~ Poisson( Σ_j λ_ijt[i,j,t] )
-  2. OD split:    split[i,:] ~ Dirichlet(α, …, α)   α = od_dirichlet_alpha
-  3. OD demand:   D[i,j] = D_i[i] * split[i,j]
-  4. Split ratio: ρ[i,j] = split[i,j]  (= D[i,j]/D_i[i], well-defined even when D_i=0)
+Sampling model (per OD pair i→j, per stage t):
+  1. OD demand:   D[i,j]  ~ Poisson( λ_ijt[i,j,t] )   (only randomness source)
+  2. Node total:  D_i[i]  = Σ_j D[i,j]
+  3. Split ratio: ρ[i,j]  = D[i,j]/D_i[i]; falls back to the deterministic
+                  structural weight λ_ijt[i,j,t]/Σ_j λ_ijt[i,j,t] when D_i=0.
+
+The OD split is a deterministic structural pattern baked into λ_ijt; demand
+uncertainty lives entirely in the per-OD Poisson, so forward trajectories vary
+only by Poisson volume noise around a structural mean (low variance).
 
 Stage-wise independence holds because each stage's Ω is sampled independently.
 """
@@ -52,25 +56,24 @@ function sample_scenarios(
         rng = MersenneTwister(seed === nothing ? 0 : seed)
     end
 
-    n     = length(params.N)
-    alpha = max(1e-6, params.od_dirichlet_alpha)
-    dir   = Dirichlet(fill(alpha, n))
+    n = length(params.N)
 
     Ω = map(1:K) do _
-        D_i = Vector{Float64}(undef, n)
+        D_i = zeros(Float64, n)
         D   = Matrix{Float64}(undef, n, n)
         ρ   = Matrix{Float64}(undef, n, n)
 
         for i in 1:n
-            # Node-total Poisson rate = sum of per-OD rates
-            λ_total = sum(params.λ_ijt[i, j, t] for j in 1:n)
-            D_i[i]  = Float64(rand(rng, Poisson(max(0.0, λ_total))))
-
-            # OD split via Dirichlet (independent of node total)
-            split = rand(rng, dir)
             for j in 1:n
-                D[i, j] = D_i[i] * split[j]
-                ρ[i, j] = split[j]   # well-defined even when D_i[i] == 0
+                D[i, j] = Float64(rand(rng, Poisson(max(0.0, params.λ_ijt[i, j, t]))))
+                D_i[i] += D[i, j]
+            end
+
+            λ_row = sum(params.λ_ijt[i, j, t] for j in 1:n)
+            for j in 1:n
+                ρ[i, j] = D_i[i] > 0 ?
+                    D[i, j] / D_i[i] :
+                    (λ_row > 0 ? params.λ_ijt[i, j, t] / λ_row : 1.0 / n)
             end
         end
 

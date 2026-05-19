@@ -250,6 +250,22 @@
 
 ---
 
+### EXP-SIMVAR — sim_μ 方差根因（证伪"重尾"猜测）
+**Date:** 2026-05-18 | **Config:** int+SCD, K=20, 200 iter, seed=42
+**Script:** `experiment/run_exp_simvar.jl`、`experiment/run_exp_nsim_sweep.jl` → `results/exp_nsim_sweep.csv`
+**目的：** EXP-011 把 sim_μ 大幅摆动归因为"成本分布重尾 / C_p 放大"。本实验验证（a）改 OD 采样模型能否降方差，（b）方差是否真的重尾。
+
+**结构性改动：** 每阶段重采样的 Dirichlet(0.3) OD 拆分 → 确定性潮汐 OD 模式 + per-OD Poisson（早高峰流向 node 3、晚高峰回 node 1）。改动落在 `src/scenarios.jl` / `src/parameters.jl`（新增 `od_pattern`）/ `experiment/common_setting.jl`。
+
+**结果：**
+- 改 OD 后单条轨迹 split SD **0.34 → 0.15**（目的地不再"瞬移"），但 sim_μ 相对 CI 仅 **±30% → ±26.5%**（nsim=500）⇒ **Dirichlet 不是 sim_μ CI 的主因**，只是轨迹结构方差的根因。
+- nsim sweep（500→8000）`ci·√nsim ≈ 241/240/248/244/243` **恒定** ⇒ 二阶矩有限、标准误严格 1/√nsim 衰减，**"重尾 / C_p 放大"猜测被证伪**。
+- 相对 CI：nsim 500→±30%、1000→±17%、2000→±13%、4000→±8.5%、8000→±6%。nsim=500 点估计不稳（−35.5 离群），≥1000 才稳定在 ~−45。
+
+**结论：** sim_μ 波动 =（a）Dirichlet 目的地瞬移（结构性，已修）+（b）nsim 太小（有限方差 σ≈243，非重尾）。**标准评测 nsim=4000（rel CI ±8.5%）**，为固定评测集 + SimulationStoppingRule 解锁前置条件。详见 [ISSUES.md §sim_μ/gap 波动性](ISSUES.md#simμgap-波动性与有意义的收敛评估)。
+
+---
+
 ## 当前推荐 Handler（EXP-010 基准）
 
 | 场景 | 推荐 | 理由 |
