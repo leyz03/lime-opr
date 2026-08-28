@@ -17,7 +17,7 @@ from pathlib import Path
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--x", choices=["iter", "time"], default="iter",
-                    help="横轴：iter（迭代次数）或 time（秒）")
+                    help="x-axis: iter (iterations) or time (seconds)")
 parser.add_argument("--csv", default="results/convergence_curve/convergence_curve.csv")
 args = parser.parse_args()
 
@@ -28,7 +28,7 @@ fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
 colors = plt.cm.tab10.colors
 x_col = "iter" if args.x == "iter" else "elapsed_s"
-x_label = "迭代次数" if args.x == "iter" else "时间 (s)"
+x_label = "Iterations" if args.x == "iter" else "Time (s)"
 
 # ── 左图：bound 和 sim_μ 收敛曲线 ─────────────────────────────────────────
 ax = axes[0]
@@ -44,8 +44,8 @@ for i, method in enumerate(methods):
                     color=c, alpha=0.1)
 
 ax.set_xlabel(x_label)
-ax.set_ylabel("目标值")
-ax.set_title("上界（bound）与策略质量（sim_μ）收敛曲线")
+ax.set_ylabel("Objective value")
+ax.set_title("Convergence of SDDP bound vs. simulated policy value (sim_μ)")
 ax.legend(fontsize=8, ncol=2)
 ax.grid(True, alpha=0.3)
 
@@ -56,11 +56,11 @@ for i, method in enumerate(methods):
     c = colors[i % len(colors)]
     ax.plot(d[x_col], d["gap_pct"], color=c, lw=1.8, label=method)
 
-ax.axhline(5,  color="gray",   linestyle="--", lw=1, label="5%  阈值")
-ax.axhline(10, color="silver", linestyle="--", lw=1, label="10% 阈值")
+ax.axhline(5,  color="gray",   linestyle="--", lw=1, label="5% threshold")
+ax.axhline(10, color="silver", linestyle="--", lw=1, label="10% threshold")
 ax.set_xlabel(x_label)
 ax.set_ylabel("gap% = (bound − sim_μ) / |sim_μ| × 100")
-ax.set_title("收敛 gap% 曲线（越小越好）")
+ax.set_title("Convergence gap% (lower is better)")
 ax.legend(fontsize=9)
 ax.grid(True, alpha=0.3)
 ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.1f%%"))
@@ -69,5 +69,5 @@ ax.set_ylim(bottom=0)
 plt.tight_layout()
 out_path = Path(args.csv).parent / f"convergence_{args.x}.png"
 plt.savefig(out_path, dpi=150)
-print(f"图像已保存：{out_path}")
+print(f"Figure saved: {out_path}")
 plt.show()
