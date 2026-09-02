@@ -47,14 +47,23 @@ end
 
 Binary-expand the *integer* states (W, M, G) only.
 
-A, U, P are aggregate fluid quantities with fractional (ρ, 1-φ) coefficients
-in their transitions — binary-expanding them would re-introduce the
-integer-compatibility trap that forces Y_i ≡ 0 (same bug as `Int` in states_int).
-So A, U, P stay continuous here, identical to states_int; only the true
-integer states are binary-encoded.
+A, U, P stay CONTINUOUS here, identical to states_int; only the true integer
+states are binary-encoded.
 
-Zou et al. (2019) tight-cut guarantee applies only to the binary portion;
-the continuous portion uses standard (non-tight) SDDP cuts.
+Why not A/U/P: the `_binary_sum` helper above is UNIT precision, so expanding
+A/U/P with it would restrict them to integers and re-create the Y_i ≡ 0 trap
+(their transitions carry fractional ρ and (1-φ) coefficients).
+
+NOTE — this is a limitation of the unit-precision helper, NOT of binarisation
+itself. Zou et al. (2019) binarise bounded continuous states at precision ε
+(x ≈ Σ 2^(l-1)·ε·λ_l), which represents fractional values fine. That variant is
+implemented in `states_binfull.jl` (encoding `:binfull`).
+
+Consequence for THIS encoding: the state space is mixed continuous/binary, so
+the Zou et al. tight-cut / finite-convergence theorem does NOT apply to the
+whole state vector — only to the W/M/G portion. EXP-GAPDECOMP measured
+essentially no gap difference between `:int` and `:bin` (3.16% vs 3.19%),
+consistent with the residual gap living in the continuous A/U/P portion.
 """
 function declare_states_bin!(sp::Model, p::BikeParams)
     N  = p.N

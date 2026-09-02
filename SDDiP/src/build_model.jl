@@ -16,6 +16,7 @@ include("parameters.jl")
 include("scenarios.jl")
 include("states_int.jl")
 include("states_bin.jl")
+include("states_binfull.jl")
 include("controls.jl")
 include("constraints.jl")
 include("objective.jl")
@@ -49,11 +50,21 @@ Assemble a `SDDP.LinearPolicyGraph` for the bike-sharing MSIP.
 
 Arguments:
 - `p`        : `BikeParams` from `build_params(cfg)`
-- `encoding` : `:int` (direct integer states) or `:bin` (binary expansion)
+- `encoding` : `:int`     — direct integer states (A/U/P continuous)
+               `:bin`     — binary-expand W/M/G only (A/U/P stay continuous)
+               `:binfull` — FULLY binary state: W/M/G at unit precision plus
+                            A/U/P at ε-precision (`eps_AUP`); this is the only
+                            encoding for which the Zou et al. (2019) theorem
+                            applies to the whole state vector. See
+                            `states_binfull.jl` for the round-down semantics.
 - `K`        : scenarios per stage for SAA
+- `eps_AUP`  : grid spacing for the A/U/P binary expansion (`:binfull` only)
+- `optimizer`: JuMP optimizer constructor (default `Gurobi.Optimizer`;
+               pass `HiGHS.Optimizer` to run without a Gurobi licence)
 """
-function build_model(p::BikeParams; encoding::Symbol = :int, K::Int = 20)
-    @assert encoding in (:int, :bin) "encoding must be :int or :bin"
+function build_model(p::BikeParams; encoding::Symbol = :int, K::Int = 20,
+                     eps_AUP::Float64 = 0.5, optimizer = Gurobi.Optimizer)
+    @assert encoding in (:int, :bin, :binfull) "encoding must be :int, :bin or :binfull"
 
     # Pre-generate all stage scenarios (stage-wise independent)
     stage_scenarios = [sample_scenarios(p, t, K) for t in 1:p.T]
@@ -62,17 +73,19 @@ function build_model(p::BikeParams; encoding::Symbol = :int, K::Int = 20)
         stages      = p.T,
         sense       = :Max,
         upper_bound = _upper_bound(p),
-        optimizer   = Gurobi.Optimizer,
+        optimizer   = optimizer,
     ) do sp, t
 
-        # Suppress Gurobi output inside subproblems
-        set_optimizer_attribute(sp, "OutputFlag", 0)
+        # Suppress solver output inside subproblems
+        JuMP.set_silent(sp)
 
         # ── 1. State variables ────────────────────────────────────────────────
         sv = if encoding == :int
             declare_states_int!(sp, p)
-        else
+        elseif encoding == :bin
             declare_states_bin!(sp, p)
+        else
+            declare_states_binfull!(sp, p; eps_AUP = eps_AUP)
         end
 
         # ── 2. Local (control) variables ─────────────────────────────────────
